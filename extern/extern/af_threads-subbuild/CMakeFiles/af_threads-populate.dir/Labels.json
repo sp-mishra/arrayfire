@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/CMakeFiles/af_threads-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/CMakeFiles/af_threads-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/CMakeFiles/af_threads-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_threads-subbuild/af_threads-populate-prefix/src/af_threads-populate-stamp/af_threads-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"af_threads-populate"
+		],
+		"name" : "af_threads-populate"
+	}
+}

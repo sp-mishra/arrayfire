@@ -1,0 +1,324 @@
+Performing C++ SOURCE FILE Test has_cxx_fp_model failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-0L448h
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_c637f/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_c637f.dir/build.make CMakeFiles/cmTC_c637f.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-0L448h'
+Building CXX object CMakeFiles/cmTC_c637f.dir/src.cxx.o
+/Library/Developer/CommandLineTools/usr/bin/c++ -Dhas_cxx_fp_model  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk   -fp-model fast -MD -MT CMakeFiles/cmTC_c637f.dir/src.cxx.o -MF CMakeFiles/cmTC_c637f.dir/src.cxx.o.d -o CMakeFiles/cmTC_c637f.dir/src.cxx.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-0L448h/src.cxx
+clang: error: unknown argument: '-fp-model'
+clang: error: no such file or directory: 'fast'; did you mean '-fast'?
+gmake[1]: *** [CMakeFiles/cmTC_c637f.dir/build.make:79: CMakeFiles/cmTC_c637f.dir/src.cxx.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-0L448h'
+gmake: *** [Makefile:127: cmTC_c637f/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+
+Determining if the CL_VERSION_3_0 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-zSWn1Z
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_43c85/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_43c85.dir/build.make CMakeFiles/cmTC_43c85.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-zSWn1Z'
+Building C object CMakeFiles/cmTC_43c85.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_43c85.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_43c85.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_43c85.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-zSWn1Z/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-zSWn1Z/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_3_0'
+  return ((int*)(&CL_VERSION_3_0))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_43c85.dir/build.make:79: CMakeFiles/cmTC_43c85.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-zSWn1Z'
+gmake: *** [Makefile:127: cmTC_43c85/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_3_0
+  return ((int*)(&CL_VERSION_3_0))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_2 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-azJC9p
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_83b8f/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_83b8f.dir/build.make CMakeFiles/cmTC_83b8f.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-azJC9p'
+Building C object CMakeFiles/cmTC_83b8f.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_83b8f.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_83b8f.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_83b8f.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-azJC9p/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-azJC9p/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_2'
+  return ((int*)(&CL_VERSION_2_2))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_83b8f.dir/build.make:79: CMakeFiles/cmTC_83b8f.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-azJC9p'
+gmake: *** [Makefile:127: cmTC_83b8f/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_2
+  return ((int*)(&CL_VERSION_2_2))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_1 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-42wbVy
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_c4ffe/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_c4ffe.dir/build.make CMakeFiles/cmTC_c4ffe.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-42wbVy'
+Building C object CMakeFiles/cmTC_c4ffe.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_c4ffe.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_c4ffe.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_c4ffe.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-42wbVy/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-42wbVy/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_1'
+  return ((int*)(&CL_VERSION_2_1))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_c4ffe.dir/build.make:79: CMakeFiles/cmTC_c4ffe.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-42wbVy'
+gmake: *** [Makefile:127: cmTC_c4ffe/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_1
+  return ((int*)(&CL_VERSION_2_1))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_0 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-oRTCpW
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_4f5d2/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_4f5d2.dir/build.make CMakeFiles/cmTC_4f5d2.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-oRTCpW'
+Building C object CMakeFiles/cmTC_4f5d2.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_4f5d2.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_4f5d2.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_4f5d2.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-oRTCpW/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-oRTCpW/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_0'
+  return ((int*)(&CL_VERSION_2_0))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_4f5d2.dir/build.make:79: CMakeFiles/cmTC_4f5d2.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-oRTCpW'
+gmake: *** [Makefile:127: cmTC_4f5d2/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_0
+  return ((int*)(&CL_VERSION_2_0))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function sgemm_ exists failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-S0Eo0o
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_8f53d/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_8f53d.dir/build.make CMakeFiles/cmTC_8f53d.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-S0Eo0o'
+Building C object CMakeFiles/cmTC_8f53d.dir/CheckFunctionExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=sgemm_ -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_8f53d.dir/CheckFunctionExists.c.o -MF CMakeFiles/cmTC_8f53d.dir/CheckFunctionExists.c.o.d -o CMakeFiles/cmTC_8f53d.dir/CheckFunctionExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-S0Eo0o/CheckFunctionExists.c
+Linking C executable cmTC_8f53d
+/opt/homebrew/Cellar/cmake/3.25.2/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8f53d.dir/link.txt --verbose=1
+/Library/Developer/CommandLineTools/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=sgemm_ -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/cmTC_8f53d.dir/CheckFunctionExists.c.o -o cmTC_8f53d 
+Undefined symbols for architecture arm64:
+  "_sgemm_", referenced from:
+      _main in CheckFunctionExists.c.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+gmake[1]: *** [CMakeFiles/cmTC_8f53d.dir/build.make:100: cmTC_8f53d] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-S0Eo0o'
+gmake: *** [Makefile:127: cmTC_8f53d/fast] Error 2
+
+
+
+Performing C++ SOURCE FILE Test has_cxx_fp_model failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-dFgxVH
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_8de7b/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_8de7b.dir/build.make CMakeFiles/cmTC_8de7b.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-dFgxVH'
+Building CXX object CMakeFiles/cmTC_8de7b.dir/src.cxx.o
+/Library/Developer/CommandLineTools/usr/bin/c++ -Dhas_cxx_fp_model  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk   -fp-model fast -MD -MT CMakeFiles/cmTC_8de7b.dir/src.cxx.o -MF CMakeFiles/cmTC_8de7b.dir/src.cxx.o.d -o CMakeFiles/cmTC_8de7b.dir/src.cxx.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-dFgxVH/src.cxx
+clang: error: unknown argument: '-fp-model'
+clang: error: no such file or directory: 'fast'; did you mean '-fast'?
+gmake[1]: *** [CMakeFiles/cmTC_8de7b.dir/build.make:79: CMakeFiles/cmTC_8de7b.dir/src.cxx.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-dFgxVH'
+gmake: *** [Makefile:127: cmTC_8de7b/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+
+Determining if the CL_VERSION_3_0 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-wnwddb
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_29ae0/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_29ae0.dir/build.make CMakeFiles/cmTC_29ae0.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-wnwddb'
+Building C object CMakeFiles/cmTC_29ae0.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_29ae0.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_29ae0.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_29ae0.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-wnwddb/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-wnwddb/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_3_0'
+  return ((int*)(&CL_VERSION_3_0))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_29ae0.dir/build.make:79: CMakeFiles/cmTC_29ae0.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-wnwddb'
+gmake: *** [Makefile:127: cmTC_29ae0/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_3_0
+  return ((int*)(&CL_VERSION_3_0))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_2 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-qjqZMl
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_d5fd0/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_d5fd0.dir/build.make CMakeFiles/cmTC_d5fd0.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-qjqZMl'
+Building C object CMakeFiles/cmTC_d5fd0.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_d5fd0.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_d5fd0.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_d5fd0.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-qjqZMl/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-qjqZMl/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_2'
+  return ((int*)(&CL_VERSION_2_2))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_d5fd0.dir/build.make:79: CMakeFiles/cmTC_d5fd0.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-qjqZMl'
+gmake: *** [Makefile:127: cmTC_d5fd0/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_2
+  return ((int*)(&CL_VERSION_2_2))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_1 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-2QqTCE
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_5939e/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_5939e.dir/build.make CMakeFiles/cmTC_5939e.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-2QqTCE'
+Building C object CMakeFiles/cmTC_5939e.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_5939e.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_5939e.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_5939e.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-2QqTCE/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-2QqTCE/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_1'
+  return ((int*)(&CL_VERSION_2_1))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_5939e.dir/build.make:79: CMakeFiles/cmTC_5939e.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-2QqTCE'
+gmake: *** [Makefile:127: cmTC_5939e/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_1
+  return ((int*)(&CL_VERSION_2_1))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the CL_VERSION_2_0 exist failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-a2W4CX
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_07bbf/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_07bbf.dir/build.make CMakeFiles/cmTC_07bbf.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-a2W4CX'
+Building C object CMakeFiles/cmTC_07bbf.dir/CheckSymbolExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc  -F/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_07bbf.dir/CheckSymbolExists.c.o -MF CMakeFiles/cmTC_07bbf.dir/CheckSymbolExists.c.o.d -o CMakeFiles/cmTC_07bbf.dir/CheckSymbolExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-a2W4CX/CheckSymbolExists.c
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-a2W4CX/CheckSymbolExists.c:8:19: error: use of undeclared identifier 'CL_VERSION_2_0'
+  return ((int*)(&CL_VERSION_2_0))[argc];
+                  ^
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_07bbf.dir/build.make:79: CMakeFiles/cmTC_07bbf.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-a2W4CX'
+gmake: *** [Makefile:127: cmTC_07bbf/fast] Error 2
+
+
+File CheckSymbolExists.c:
+/* */
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/OpenCL.framework/Headers/cl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef CL_VERSION_2_0
+  return ((int*)(&CL_VERSION_2_0))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function sgemm_ exists failed with the following output:
+Change Dir: /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-Az7bVG
+
+Run Build Command(s):/opt/homebrew/bin/gmake -f Makefile cmTC_fdcaa/fast && /opt/homebrew/bin/gmake  -f CMakeFiles/cmTC_fdcaa.dir/build.make CMakeFiles/cmTC_fdcaa.dir/build
+gmake[1]: Entering directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-Az7bVG'
+Building C object CMakeFiles/cmTC_fdcaa.dir/CheckFunctionExists.c.o
+/Library/Developer/CommandLineTools/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=sgemm_ -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -MD -MT CMakeFiles/cmTC_fdcaa.dir/CheckFunctionExists.c.o -MF CMakeFiles/cmTC_fdcaa.dir/CheckFunctionExists.c.o.d -o CMakeFiles/cmTC_fdcaa.dir/CheckFunctionExists.c.o -c /Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-Az7bVG/CheckFunctionExists.c
+Linking C executable cmTC_fdcaa
+/opt/homebrew/Cellar/cmake/3.25.2/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fdcaa.dir/link.txt --verbose=1
+/Library/Developer/CommandLineTools/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=sgemm_ -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/cmTC_fdcaa.dir/CheckFunctionExists.c.o -o cmTC_fdcaa 
+Undefined symbols for architecture arm64:
+  "_sgemm_", referenced from:
+      _main in CheckFunctionExists.c.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+gmake[1]: *** [CMakeFiles/cmTC_fdcaa.dir/build.make:100: cmTC_fdcaa] Error 1
+gmake[1]: Leaving directory '/Users/I501980/Documents/Code/Personal/arrayfire/extern/CMakeFiles/CMakeScratch/TryCompile-Az7bVG'
+gmake: *** [Makefile:127: cmTC_fdcaa/fast] Error 2
+
+
+

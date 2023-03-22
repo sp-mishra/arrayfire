@@ -1,0 +1,15 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=git
+command=/opt/homebrew/Cellar/cmake/3.25.2/bin/cmake;-P;/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/tmp/ocl_clfft-populate-gitclone.cmake
+source_dir=/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-src
+work_dir=/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern
+repository=https://github.com/arrayfire/clFFT.git
+remote=origin
+init_submodules=TRUE
+recurse_submodules=--recursive
+submodules=
+CMP0097=NEW
+

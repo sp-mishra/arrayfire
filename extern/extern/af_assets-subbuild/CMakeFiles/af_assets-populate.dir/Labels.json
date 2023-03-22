@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/CMakeFiles/af_assets-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/CMakeFiles/af_assets-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/CMakeFiles/af_assets-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/af_assets-subbuild/af_assets-populate-prefix/src/af_assets-populate-stamp/af_assets-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"af_assets-populate"
+		],
+		"name" : "af_assets-populate"
+	}
+}

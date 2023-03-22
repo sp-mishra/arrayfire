@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/CMakeFiles/ocl_cl2hpp-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/CMakeFiles/ocl_cl2hpp-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/CMakeFiles/ocl_cl2hpp-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_cl2hpp-subbuild/ocl_cl2hpp-populate-prefix/src/ocl_cl2hpp-populate-stamp/ocl_cl2hpp-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"ocl_cl2hpp-populate"
+		],
+		"name" : "ocl_cl2hpp-populate"
+	}
+}

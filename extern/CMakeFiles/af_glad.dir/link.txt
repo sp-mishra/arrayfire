@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc libaf_glad.a "extern/af_glad-build/CMakeFiles/af_glad_obj_lib.dir/src/glad.c.o"
+/Library/Developer/CommandLineTools/usr/bin/ranlib libaf_glad.a

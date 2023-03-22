@@ -47,8 +47,8 @@ endif()
 #Set Intel OpenMP as default MKL thread layer
 set(MKL_THREAD_LAYER "Intel OpenMP" CACHE STRING "The thread layer to choose for MKL")
 
-find_package(CUDA 10.2)
-find_package(cuDNN 4.0)
+# find_package(CUDA 10.2)
+# find_package(cuDNN 4.0)
 find_package(OpenCL 1.2)
 find_package(OpenGL)
 find_package(glad CONFIG QUIET)
@@ -73,23 +73,22 @@ include(boost_package)
 include(config_ccache)
 
 option(AF_BUILD_CPU      "Build ArrayFire with a CPU backend"        ON)
-option(AF_BUILD_CUDA     "Build ArrayFire with a CUDA backend"       ${CUDA_FOUND})
+option(AF_BUILD_CUDA     "Build ArrayFire with a CUDA backend"       OFF)
 option(AF_BUILD_OPENCL   "Build ArrayFire with a OpenCL backend"     ${OpenCL_FOUND})
 option(AF_BUILD_UNIFIED  "Build Backend-Independent ArrayFire API"   ON)
-option(AF_BUILD_DOCS     "Create ArrayFire Documentation"            ${DOXYGEN_FOUND})
-option(AF_BUILD_EXAMPLES "Build Examples"                            ON)
-option(AF_WITH_CUDNN     "Use cuDNN for convolveNN functions"        ${cuDNN_FOUND})
-option(AF_BUILD_FORGE
-    "Forge libs are not built by default as it is not link time dependency" OFF)
+option(AF_BUILD_DOCS     "Create ArrayFire Documentation"            OFF)
+option(AF_BUILD_EXAMPLES "Build Examples"                            OFF)
+option(AF_WITH_CUDNN     "Use cuDNN for convolveNN functions"        OFF)
+option(AF_BUILD_FORGE    "Forge libs are not built by default as it is not link time dependency" OFF)
 
 option(AF_WITH_NONFREE  "Build ArrayFire nonfree algorithms"   OFF)
 option(AF_WITH_LOGGING  "Build ArrayFire with logging support" ON)
-option(AF_WITH_STACKTRACE  "Add stacktraces to the error messages." ON)
+option(AF_WITH_STACKTRACE  "Add stacktraces to the error messages." OFF)
 option(AF_CACHE_KERNELS_TO_DISK "Enable caching kernels to disk" ON)
-option(AF_WITH_STATIC_MKL "Link against static Intel MKL libraries" OFF)
+option(AF_WITH_STATIC_MKL "Link against static Intel MKL libraries" ON)
 option(AF_WITH_STATIC_CUDA_NUMERIC_LIBS "Link libafcuda with static numeric libraries(cublas, cufft, etc.)" OFF)
-option(AF_WITH_SPDLOG_HEADER_ONLY "Build ArrayFire with header only version of spdlog" OFF)
-option(AF_WITH_FMT_HEADER_ONLY "Build ArrayFire with header only version of fmt" OFF)
+option(AF_WITH_SPDLOG_HEADER_ONLY "Build ArrayFire with header only version of spdlog" ON)
+option(AF_WITH_FMT_HEADER_ONLY "Build ArrayFire with header only version of fmt" ON)
 
 if(AF_WITH_STATIC_CUDA_NUMERIC_LIBS)
   option(AF_WITH_PRUNE_STATIC_CUDA_NUMERIC_LIBS "Prune CUDA static libraries to reduce binary size.(WARNING: May break some libs on older CUDA toolkits for some compute arch)" OFF)
@@ -117,15 +116,13 @@ else()
                      OPTIONS       "Basic" "libbacktrace" "addr2line" "None")
 endif()
 
-option(AF_INSTALL_STANDALONE "Build installers that include all dependencies" OFF)
+option(AF_INSTALL_STANDALONE "Build installers that include all dependencies" ON)
 
 cmake_dependent_option(AF_WITH_RELATIVE_TEST_DIR "Use relative paths for the test data directory(For continious integration(CI) purposes only)" OFF
   "BUILD_TESTING" OFF)
 
-cmake_dependent_option(AF_WITH_IMAGEIO "Build ArrayFire with Image IO support" ${FreeImage_FOUND}
-                       "FreeImage_FOUND" OFF)
-cmake_dependent_option(AF_BUILD_FRAMEWORK "Build an ArrayFire framework for Apple platforms.(Experimental)" OFF
-                       "APPLE" OFF)
+cmake_dependent_option(AF_WITH_IMAGEIO "Build ArrayFire with Image IO support" ${FreeImage_FOUND} "FreeImage_FOUND" OFF)
+cmake_dependent_option(AF_BUILD_FRAMEWORK "Build an ArrayFire framework for Apple platforms.(Experimental)" OFF "APPLE" OFF)
 
 option(AF_WITH_STATIC_FREEIMAGE "Use Static FreeImage Lib" OFF)
 
@@ -195,7 +192,7 @@ if(AF_COMPUTE_LIBRARY STREQUAL "Intel-MKL")
   endif()
 endif()
 find_package(BLAS)
-find_package(LAPACK)
+# find_package(LAPACK)
 
 # IF: the old USE_CPU_MKL/USE_OPENCL_MKL flags are present,
 # THEN Irrespective of AF_COMPUTE_LIBRARY value, continue with MKL to preserve old
@@ -314,8 +311,7 @@ if(CMAKE_CROSSCOMPILING)
   if(NATIVE_BIN_DIR)
     include(${NATIVE_BIN_DIR}/ImportExecutables.cmake)
   else()
-    message(SEND_ERROR "Native Directory not found. Run cmake in a separate"
-                       "directory and build the bin2cpp target.")
+    message(SEND_ERROR "Native Directory not found. Run cmake in a separate directory and build the bin2cpp target.")
   endif()
 else()
   add_executable(bin2cpp CMakeModules/bin2cpp.cpp
@@ -354,7 +350,7 @@ add_subdirectory(src/api/c)
 add_subdirectory(src/api/cpp)
 
 conditional_directory(AF_BUILD_CPU     src/backend/cpu)
-conditional_directory(AF_BUILD_CUDA    src/backend/cuda)
+# conditional_directory(AF_BUILD_CUDA    src/backend/cuda)
 conditional_directory(AF_BUILD_OPENCL  src/backend/opencl)
 conditional_directory(AF_BUILD_UNIFIED src/api/unified)
 
@@ -366,9 +362,9 @@ if(TARGET afcpu)
   list(APPEND built_backends afcpu)
 endif()
 
-if(TARGET afcuda)
-  list(APPEND built_backends afcuda)
-endif()
+# if(TARGET afcuda)
+#   list(APPEND built_backends afcuda)
+# endif()
 
 if(TARGET afopencl)
   list(APPEND built_backends afopencl)
@@ -389,7 +385,8 @@ if(AF_INSTALL_STANDALONE)
   if(HAS_RUNPATH_FLAG)
     set_target_properties(${built_backends} PROPERTIES
       INSTALL_RPATH "$ORIGIN"
-      LINK_OPTIONS "-Wl,--enable-new-dtags")
+      # LINK_OPTIONS "-Wl,--enable-new-dtags")
+      LINK_OPTIONS "-Wl")
   endif()
 endif()
 
@@ -504,6 +501,7 @@ install(FILES ${ArrayFire_BINARY_DIR}/cmake/install/ArrayFireConfig.cmake
 if(BUILD_WITH_MKL AND AF_INSTALL_STANDALONE)
   if(TARGET MKL::ThreadingLibrary)
     get_filename_component(mkl_tl ${MKL_ThreadingLibrary_LINK_LIBRARY} REALPATH)
+    message("MKL_ThreadingLibrary_LINK_LIBRARY=${MKL_ThreadingLibrary_LINK_LIBRARY}")
     install(FILES
       $<TARGET_FILE:MKL::ThreadingLibrary>
       ${mkl_tl}
@@ -524,6 +522,7 @@ if(BUILD_WITH_MKL AND AF_INSTALL_STANDALONE)
     get_filename_component(mkl_rnt ${MKL_RT_LINK_LIBRARY} REALPATH)
     get_filename_component(mkl_shd ${MKL_Core_LINK_LIBRARY} REALPATH)
     get_filename_component(mkl_tly ${MKL_ThreadLayer_LINK_LIBRARY} REALPATH)
+    get_filename_component(mkl_tly ${MKL_ThreadingLibrary_LINK_LIBRARY} REALPATH)
     install(FILES
       ${mkl_rnt}
       ${mkl_shd}
@@ -569,7 +568,7 @@ configure_file(
   ${ArrayFire_SOURCE_DIR}/CMakeModules/CTestCustom.cmake
   ${ArrayFire_BINARY_DIR}/CTestCustom.cmake)
 
-include(CTest)
+# include(CTest)
 
 # Handle depricated BUILD_TEST variable if found.
 if(BUILD_TEST)

@@ -1,0 +1,27 @@
+[submodule "extern/spdlog-src"]
+	path = extern/spdlog-src
+	url = https://github.com/gabime/spdlog.git
+[submodule "extern/span-lite-src"]
+	path = extern/span-lite-src
+	url = https://github.com/martinmoene/span-lite.git
+[submodule "extern/af_threads-src"]
+	path = extern/af_threads-src
+	url = https://github.com/arrayfire/threads.git
+[submodule "extern/ocl_clfft-src"]
+	path = extern/ocl_clfft-src
+	url = https://github.com/arrayfire/clFFT.git
+[submodule "extern/ocl_cl2hpp-src"]
+	path = extern/ocl_cl2hpp-src
+	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git
+[submodule "extern/ocl_clblast-src"]
+	path = extern/ocl_clblast-src
+	url = https://github.com/cnugteren/CLBlast.git
+[submodule "extern/af_forge-src"]
+	path = extern/af_forge-src
+	url = https://github.com/arrayfire/forge.git
+[submodule "extern/af_assets-src"]
+	path = extern/af_assets-src
+	url = https://github.com/arrayfire/assets.git
+[submodule "extern/af_glad-src"]
+	path = extern/af_glad-src
+	url = https://github.com/arrayfire/glad.git

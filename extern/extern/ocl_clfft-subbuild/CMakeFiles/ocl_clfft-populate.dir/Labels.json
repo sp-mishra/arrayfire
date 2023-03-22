@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/CMakeFiles/ocl_clfft-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/CMakeFiles/ocl_clfft-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/CMakeFiles/ocl_clfft-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clfft-subbuild/ocl_clfft-populate-prefix/src/ocl_clfft-populate-stamp/ocl_clfft-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"ocl_clfft-populate"
+		],
+		"name" : "ocl_clfft-populate"
+	}
+}

@@ -5,6 +5,7 @@
 # The complete license agreement can be obtained at:
 # http://arrayfire.com/licenses/BSD-3-Clause
 
+message("====Opencl backend Start====")
 dependency_check(OpenCL_FOUND "OpenCL not found.")
 
 include(InternalUtils)
@@ -541,7 +542,8 @@ target_link_libraries(afopencl
 if(APPLE)
   target_link_libraries(afopencl PRIVATE OpenGL::GL)
 endif()
-
+set(LAPACK_FOUND ON)
+message("LAPACK_FOUND=${LAPACK_FOUND} OR BUILD_WITH_MKL=${BUILD_WITH_MKL}")
 if(LAPACK_FOUND OR BUILD_WITH_MKL)
   target_sources(afopencl
     PRIVATE
@@ -667,3 +669,4 @@ source_group(api\\c   REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/api/c/*)
 source_group(backend  REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/backend/common/*|${CMAKE_CURRENT_SOURCE_DIR}/*)
 source_group(backend\\kernel  REGULAR_EXPRESSION ${CMAKE_CURRENT_SOURCE_DIR}/kernel/*|${CMAKE_CURRENT_SOURCE_DIR}/kernel/sort_by_key/*|${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_by_key/*)
 source_group("generated files" FILES ${ArrayFire_BINARY_DIR}/src/backend/build_version.hpp ${ArrayFire_BINARY_DIR}/include/af/version.h)
+message("====Opencl backend End====")

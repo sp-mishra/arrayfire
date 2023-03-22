@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc libStatTimer.a CMakeFiles/StatTimer.dir/statisticalTimer.CPU.cpp.o CMakeFiles/StatTimer.dir/statisticalTimer.GPU.cpp.o CMakeFiles/StatTimer.dir/statisticalTimer.extern.cpp.o CMakeFiles/StatTimer.dir/stdafx.cpp.o
+/Library/Developer/CommandLineTools/usr/bin/ranlib libStatTimer.a

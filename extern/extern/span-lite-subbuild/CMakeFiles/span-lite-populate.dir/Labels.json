@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/CMakeFiles/span-lite-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/CMakeFiles/span-lite-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/CMakeFiles/span-lite-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/span-lite-subbuild/span-lite-populate-prefix/src/span-lite-populate-stamp/span-lite-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"span-lite-populate"
+		],
+		"name" : "span-lite-populate"
+	}
+}

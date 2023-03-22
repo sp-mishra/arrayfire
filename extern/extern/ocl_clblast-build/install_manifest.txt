@@ -1,0 +1,7 @@
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/lib/libclblast.a
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/include/clblast_half.h
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/include/clblast.h
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/include/clblast_c.h
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/lib/cmake/CLBlast/CLBlastConfig.cmake
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/lib/cmake/CLBlast/CLBlastConfig-release.cmake
+/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-build/pkg/lib/pkgconfig/clblast.pc

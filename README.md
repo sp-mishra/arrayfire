@@ -194,3 +194,15 @@ If you wish to use either of these marks in your own project, please consult
 [31]: https://github.com/arrayfire/arrayfire/blob/master/examples/machine_learning/perceptron.cpp
 [32]: https://github.com/arrayfire/arrayfire/wiki/Getting-ArrayFire
 [33]: https://github.com/arrayfire/arrayfire/wiki/Code-Of-Conduct
+
+
+```cmake
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DAF_BUILD_CUDA=OFF -DAF_BUILD_OPENCL=OFF -DAF_BUILD_CPU=ON -DAF_COMPUTE_LIBRARY="Intel-MKL" -DCMAKE_INSTALL_RPATH=/opt/arrayfire/lib -DCBLAS_ROOT_DIR=/opt/homebrew/Cellar/openblas/0.3.21 -DCBLAS_INCLUDE_DIR=/opt/homebrew/Cellar/openblas/0.3.21/include -DINTEL_MKL_ROOT=/opt/intel/oneapi/mkl -DLAPACKE_ROOT_DIR=/opt/homebrew/Cellar/lapack/3.11/
+
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DAF_BUILD_CUDA=OFF -DAF_BUILD_OPENCL=ON -DAF_BUILD_CPU=ON -DAF_COMPUTE_LIBRARY="FFTW/LAPACK/BLAS" -DCMAKE_INSTALL_RPATH=/opt/arrayfire/lib -DCBLAS_ROOT_DIR=/opt/homebrew/Cellar/openblas/0.3.21 -DCBLAS_INCLUDE_DIR=/opt/homebrew/Cellar/openblas/0.3.21/include -DCBLAS_LIBRARIES=/opt/homebrew/Cellar/openblas/0.3.21/lib/libopenblas.a -DINTEL_MKL_ROOT=/opt/intel/oneapi/mkl -DLAPACKE_ROOT_DIR=/opt/homebrew/Cellar/lapack/3.11/
+
+#Working
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DAF_BUILD_CUDA=OFF -DAF_BUILD_OPENCL=ON -DAF_BUILD_CPU=ON -DAF_BUILD_UNIFIED=OFF -DAF_COMPUTE_LIBRARY="FFTW/LAPACK/BLAS" -DCMAKE_INSTALL_RPATH=/opt/arrayfire/lib -DCBLAS_ROOT_DIR=/opt/homebrew/Cellar/openblas/0.3.21 -DCBLAS_INCLUDE_DIR=/opt/homebrew/Cellar/openblas/0.3.21/include -DINTEL_MKL_ROOT=/opt/intel/oneapi/mkl -DLAPACKE_ROOT_DIR=/opt/homebrew/Cellar/lapack/3.11/ -DAF_BUILD_FRAMEWORK=OFF -DAF_INSTALL_STANDALONE=OFF
+
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DAF_BUILD_CUDA=OFF -DAF_BUILD_OPENCL=ON -DAF_BUILD_CPU=ON -DAF_BUILD_UNIFIED=ON -DAF_COMPUTE_LIBRARY="FFTW/LAPACK/BLAS" -DCMAKE_INSTALL_RPATH=/usr/local/ -DCBLAS_ROOT_DIR=/opt/homebrew/Cellar/openblas/0.3.21 -DCBLAS_INCLUDE_DIR=/opt/homebrew/Cellar/openblas/0.3.21/include -DINTEL_MKL_ROOT=/opt/intel/oneapi/mkl -DLAPACKE_ROOT_DIR=/opt/homebrew/Cellar/lapack/3.11/ -DAF_BUILD_FRAMEWORK=OFF -DAF_INSTALL_STANDALONE=OFF
+```

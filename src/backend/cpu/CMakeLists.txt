@@ -267,7 +267,7 @@ target_sources(afcpu
     kernel/unwrap.hpp
     kernel/wrap.hpp
   )
-
+  include_directories(${CBLAS_INCLUDE_DIR})
 if (AF_WITH_CPUID)
   target_compile_definitions(afcpu PRIVATE -DAF_WITH_CPUID)
 endif(AF_WITH_CPUID)
@@ -284,18 +284,21 @@ target_sources(afcpu
   )
 
 arrayfire_set_default_cxx_flags(afcpu)
-
+set(CBLAS_INCLUDE_DIR $ENV{MKLROOT}/latest/include/)
 include("${CMAKE_CURRENT_SOURCE_DIR}/kernel/sort_by_key/CMakeLists.txt")
-
+message("AF_INSTALL_INC_DIR=${AF_INSTALL_INC_DIR} CBLAS_INCLUDE_DIR=${CBLAS_INCLUDE_DIR} CBLAS_LIBRARIES=${CBLAS_LIBRARIES}")
+message("CMAKE_CURRENT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(afcpu
   PUBLIC
     $<BUILD_INTERFACE:${ArrayFire_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${ArrayFire_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${AF_INSTALL_INC_DIR}>
   PRIVATE
+    ${CBLAS_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${${threads_prefix}_SOURCE_DIR}/include)
 
+message("CBLAS_INCLUDE_DIR=${CBLAS_INCLUDE_DIR}")
 target_include_directories(afcpu
   SYSTEM PRIVATE
     ${CBLAS_INCLUDE_DIR})
@@ -313,6 +316,7 @@ target_link_libraries(afcpu
     cpu_sort_by_key
     Threads::Threads
   )
+message("BUILD_WITH_MKL=${BUILD_WITH_MKL} MKL_BATCH=${MKL_BATCH} AF_WITH_STATIC_MKL=${AF_WITH_STATIC_MKL}")
 if(BUILD_WITH_MKL)
   target_compile_definitions(afcpu PRIVATE USE_MKL)
 
@@ -337,7 +341,7 @@ else()
     target_link_libraries(afcpu PRIVATE LAPACKE::LAPACKE ${LAPACK_LIBRARIES})
   endif()
 endif()
-
+message("LAPACK_FOUND=${LAPACK_FOUND} BUILD_WITH_MKL=${BUILD_WITH_MKL}")
 if(LAPACK_FOUND OR BUILD_WITH_MKL)
   target_compile_definitions(afcpu PRIVATE WITH_LINEAR_ALGEBRA)
 endif()

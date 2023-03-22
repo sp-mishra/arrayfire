@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/CMakeFiles/ocl_clblast-populate"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/CMakeFiles/ocl_clblast-populate.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/CMakeFiles/ocl_clblast-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-test.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/extern/ocl_clblast-subbuild/ocl_clblast-populate-prefix/src/ocl_clblast-populate-stamp/ocl_clblast-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"ocl_clblast-populate"
+		],
+		"name" : "ocl_clblast-populate"
+	}
+}

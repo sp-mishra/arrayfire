@@ -130,6 +130,7 @@ function(get_native_path out_path path)
   endif ()
 endfunction()
 
+message("CMAKE_INSTALL_RPATH=${CMAKE_INSTALL_RPATH}")
 macro(arrayfire_set_cmake_default_variables)
   set(CMAKE_PREFIX_PATH "${ArrayFire_BINARY_DIR};${CMAKE_PREFIX_PATH}")
   set(BUILD_SHARED_LIBS ON)

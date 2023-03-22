@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/src/backend/opencl/CMakeFiles/CLBlast-ext"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/src/backend/opencl/CMakeFiles/CLBlast-ext.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/src/backend/opencl/CMakeFiles/CLBlast-ext-complete.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-build.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-configure.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-download.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-install.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-mkdir.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-patch.rule"
+		},
+		{
+			"file" : "/Users/I501980/Documents/Code/Personal/arrayfire/extern/third_party/CLBlast/src/CLBlast-ext-stamp/CLBlast-ext-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"CLBlast-ext"
+		],
+		"name" : "CLBlast-ext"
+	}
+}

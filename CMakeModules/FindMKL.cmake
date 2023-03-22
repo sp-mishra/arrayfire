@@ -113,6 +113,8 @@ find_path(MKL_INCLUDE_DIR
 
 if(MKL_INCLUDE_DIR)
   mark_as_advanced(MKL_INCLUDE_DIR)
+  message("ONEAPI_ROOT=$ENV{ONEAPI_ROOT}")
+  message("MKL_INCLUDE_DIR=${MKL_INCLUDE_DIR}")
 endif()
 
 function(find_version)
@@ -151,6 +153,7 @@ if(MKL_INCLUDE_DIR)
       REGEX "INTEL_MKL_VERSION * ([0-9]+)")
 
   set(MKL_VERSION_STRING ${MKL_MAJOR_VERSION}.${MKL_MINOR_VERSION}.${MKL_UPDATE_VERSION})
+  message("MKL_VERSION_STRING=${MKL_VERSION_STRING}")
   mark_as_advanced(MKL_VERSION_HEADER)
 endif()
 
@@ -253,7 +256,7 @@ function(find_mkl_library)
     endif()
   endif()
 
-  #message(STATUS "NAME: ${mkl_args_NAME} LIBNAME: ${mkl_args_LIBRARY_NAME} MKL_${mkl_args_NAME}_LINK_LIBRARY  ${MKL_${mkl_args_NAME}_LINK_LIBRARY}")
+  message(STATUS "NAME: ${mkl_args_NAME} LIBNAME: ${mkl_args_LIBRARY_NAME} MKL_${mkl_args_NAME}_LINK_LIBRARY  ${MKL_${mkl_args_NAME}_LINK_LIBRARY}")
 
   if(mkl_args_SEARCH_STATIC)
     find_library(MKL_${mkl_args_NAME}_STATIC_LINK_LIBRARY
@@ -469,6 +472,7 @@ if(MKL_Static_FOUND AND NOT TARGET MKL::Static)
 endif()
 
 set(MKL_FOUND OFF)
+message("MKL_Shared_FOUND=${MKL_Shared_FOUND} MKL_Static_FOUND=${MKL_Static_FOUND}")
 if(MKL_Shared_FOUND OR MKL_Static_FOUND)
   set(MKL_FOUND ON)
 endif()

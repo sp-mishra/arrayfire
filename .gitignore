@@ -11,7 +11,7 @@ GPATH
 #docs/details/examples.dox
 /TAGS
 external/
-# extern/
+extern/
 compile_commands.json
 venv
 test/gtest

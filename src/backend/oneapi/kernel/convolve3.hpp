@@ -1,3 +1,13 @@
+/*******************************************************
+ * Copyright (c) 2023, ArrayFire
+ * All rights reserved.
+ *
+ * This file is distributed under 3-clause BSD license.
+ * The complete license agreement can be obtained at:
+ * http://arrayfire.com/licenses/BSD-3-Clause
+ ********************************************************/
+#pragma once
+
 int index(int i, int j, int k, int jstride, int kstride) {
     return i + j * jstride + k * kstride;
 }
@@ -7,7 +17,7 @@ class conv3HelperCreateKernel {
    public:
     conv3HelperCreateKernel(write_accessor<T> out, KParam oInfo,
                             read_accessor<T> signal, KParam sInfo,
-                            local_accessor<aT> localMem,
+                            sycl::local_accessor<aT> localMem,
                             read_accessor<aT> impulse, KParam fInfo, int nBBS0,
                             int nBBS1, int ostep1, int ostep2, int ostep3,
                             int sstep1, int sstep2, int sstep3,
@@ -55,18 +65,12 @@ class conv3HelperCreateKernel {
              sstep3_ *
                  sInfo_.strides[3]); /* activated with batched input filter */
 
-        int lx  = it.get_local_id(0);
-        int ly  = it.get_local_id(1);
-        int lz  = it.get_local_id(2);
-        int gx  = g.get_local_range(0) * (g.get_group_id(0) - b2 * nBBS0_) + lx;
-        int gy  = g.get_local_range(1) * g.get_group_id(1) + ly;
-        int gz  = g.get_local_range(2) * g.get_group_id(2) + lz;
-        int lx2 = lx + g.get_local_range(0);
-        int ly2 = ly + g.get_local_range(1);
-        int lz2 = lz + g.get_local_range(2);
-        int gx2 = gx + g.get_local_range(0);
-        int gy2 = gy + g.get_local_range(1);
-        int gz2 = gz + g.get_local_range(2);
+        int lx = it.get_local_id(0);
+        int ly = it.get_local_id(1);
+        int lz = it.get_local_id(2);
+        int gx = g.get_local_range(0) * (g.get_group_id(0) - b2 * nBBS0_) + lx;
+        int gy = g.get_local_range(1) * g.get_group_id(1) + ly;
+        int gz = g.get_local_range(2) * g.get_group_id(2) + lz;
 
         int s0 = sInfo_.strides[0];
         int s1 = sInfo_.strides[1];
@@ -123,7 +127,7 @@ class conv3HelperCreateKernel {
     KParam oInfo_;
     read_accessor<T> signal_;
     KParam sInfo_;
-    local_accessor<aT> localMem_;
+    sycl::local_accessor<aT> localMem_;
     read_accessor<aT> impulse_;
     KParam fInfo_;
     int nBBS0_;
@@ -143,7 +147,7 @@ void conv3Helper(const conv_kparam_t<aT> &param, Param<T> &out,
                  const int rank, const bool EXPAND) {
     auto Q = getQueue();
     Q.submit([&](auto &h) {
-        local_accessor<aT> localMem(param.loc_size, h);
+        sycl::local_accessor<aT> localMem(param.loc_size, h);
         write_accessor<T> outAcc{*out.data, h};
         read_accessor<T> signalAcc{*signal.data, h};
         read_accessor<aT> impulseAcc{*param.impulse, h};

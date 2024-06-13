@@ -72,6 +72,36 @@ inline cdouble min<cdouble>(cdouble lhs, cdouble rhs) {
 }
 
 template<typename T>
+static inline auto is_nan(const T &val) -> bool {
+    return false;
+}
+
+template<>
+inline auto is_nan<sycl::half>(const sycl::half &val) -> bool {
+    return sycl::isnan(val);
+}
+
+template<>
+inline auto is_nan<float>(const float &val) -> bool {
+    return sycl::isnan(val);
+}
+
+template<>
+inline auto is_nan<double>(const double &val) -> bool {
+    return sycl::isnan(val);
+}
+
+template<>
+inline auto is_nan<cfloat>(const cfloat &in) -> bool {
+    return sycl::isnan(real(in)) || sycl::isnan(imag(in));
+}
+
+template<>
+inline auto is_nan<cdouble>(const cdouble &in) -> bool {
+    return sycl::isnan(real(in)) || sycl::isnan(imag(in));
+}
+
+template<typename T>
 static T scalar(double val) {
     return (T)(val);
 }
@@ -79,8 +109,6 @@ static T scalar(double val) {
 template<>
 inline cfloat scalar<cfloat>(double val) {
     cfloat cval(static_cast<float>(val));
-    // cval.real() = (float)val;
-    // cval.imag() = 0;
     return cval;
 }
 
@@ -128,8 +156,8 @@ inline double minval() {
     return -std::numeric_limits<double>::infinity();
 }
 template<>
-inline arrayfire::common::half minval() {
-    return -std::numeric_limits<arrayfire::common::half>::infinity();
+inline sycl::half minval() {
+    return -1 * std::numeric_limits<sycl::half>::infinity();
 }
 
 template<typename T>
@@ -142,11 +170,6 @@ static inline T imag(T in) {
     return std::imag(in);
 }
 
-inline arrayfire::common::half operator+(arrayfire::common::half lhs,
-                                         arrayfire::common::half rhs) noexcept {
-    return arrayfire::common::half(static_cast<float>(lhs) +
-                                   static_cast<float>(rhs));
-}
 }  // namespace oneapi
 }  // namespace arrayfire
 

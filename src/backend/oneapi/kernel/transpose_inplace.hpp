@@ -16,6 +16,8 @@
 #include <err_oneapi.hpp>
 #include <traits.hpp>
 
+#include <sycl/sycl.hpp>
+
 #include <string>
 #include <vector>
 
@@ -41,14 +43,9 @@ cdouble getConjugate(const cdouble &in) {
 
 #define doOp(v) (conjugate_ ? getConjugate((v)) : (v))
 
-constexpr int TILE_DIM  = 16;
-constexpr int THREADS_X = TILE_DIM;
-constexpr int THREADS_Y = 256 / TILE_DIM;
-
-template<typename T, int dimensions>
-using local_accessor =
-    sycl::accessor<T, dimensions, sycl::access::mode::read_write,
-                   sycl::access::target::local>;
+constexpr dim_t TILE_DIM  = 16;
+constexpr dim_t THREADS_X = TILE_DIM;
+constexpr dim_t THREADS_Y = 256 / TILE_DIM;
 
 template<typename T>
 class transposeInPlaceKernel {
@@ -56,9 +53,8 @@ class transposeInPlaceKernel {
     transposeInPlaceKernel(const sycl::accessor<T> iData, const KParam in,
                            const int blocksPerMatX, const int blocksPerMatY,
                            const bool conjugate, const bool IS32MULTIPLE,
-                           local_accessor<T, 1> shrdMem_s,
-                           local_accessor<T, 1> shrdMem_d,
-                           sycl::stream debugStream)
+                           sycl::local_accessor<T, 1> shrdMem_s,
+                           sycl::local_accessor<T, 1> shrdMem_d)
         : iData_(iData)
         , in_(in)
         , blocksPerMatX_(blocksPerMatX)
@@ -66,8 +62,7 @@ class transposeInPlaceKernel {
         , conjugate_(conjugate)
         , IS32MULTIPLE_(IS32MULTIPLE)
         , shrdMem_s_(shrdMem_s)
-        , shrdMem_d_(shrdMem_d)
-        , debugStream_(debugStream) {}
+        , shrdMem_d_(shrdMem_d) {}
     void operator()(sycl::nd_item<2> it) const {
         const int shrdStride = TILE_DIM + 1;
 
@@ -163,9 +158,8 @@ class transposeInPlaceKernel {
     int blocksPerMatY_;
     bool conjugate_;
     bool IS32MULTIPLE_;
-    local_accessor<T, 1> shrdMem_s_;
-    local_accessor<T, 1> shrdMem_d_;
-    sycl::stream debugStream_;
+    sycl::local_accessor<T, 1> shrdMem_s_;
+    sycl::local_accessor<T, 1> shrdMem_d_;
 };
 
 template<typename T>
@@ -181,15 +175,15 @@ void transpose_inplace(Param<T> in, const bool conjugate,
 
     getQueue().submit([&](sycl::handler &h) {
         auto r = in.data->get_access(h);
-        sycl::stream debugStream(128, 128, h);
+        auto shrdMem_s =
+            sycl::local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
+        auto shrdMem_d =
+            sycl::local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
 
-        auto shrdMem_s = local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
-        auto shrdMem_d = local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
-
-        h.parallel_for(sycl::nd_range{global, local},
-                       transposeInPlaceKernel<T>(
-                           r, in.info, blk_x, blk_y, conjugate, IS32MULTIPLE,
-                           shrdMem_s, shrdMem_d, debugStream));
+        h.parallel_for(
+            sycl::nd_range{global, local},
+            transposeInPlaceKernel<T>(r, in.info, blk_x, blk_y, conjugate,
+                                      IS32MULTIPLE, shrdMem_s, shrdMem_d));
     });
     ONEAPI_DEBUG_FINISH(getQueue());
 }

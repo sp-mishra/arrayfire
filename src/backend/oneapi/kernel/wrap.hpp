@@ -13,8 +13,11 @@
 #include <common/dispatch.hpp>
 #include <common/kernel_cache.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <kernel/default_config.hpp>
 #include <math.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -22,14 +25,6 @@
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
-
-template<typename T>
-using local_accessor = sycl::accessor<T, 1, sycl::access::mode::read_write,
-                                      sycl::access::target::local>;
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 template<typename T>
 class wrapCreateKernel {
@@ -68,8 +63,8 @@ class wrapCreateKernel {
 
         T *optr = optrAcc_.get_pointer() + idx2 * out_.strides[2] +
                   idx3 * out_.strides[3] + out_.offset;
-        T *iptr = iptrAcc_.get_pointer() + idx2 * in_.strides[2] +
-                  idx3 * in_.strides[3] + in_.offset;
+        const T *iptr = iptrAcc_.get_pointer() + idx2 * in_.strides[2] +
+                        idx3 * in_.strides[3] + in_.offset;
 
         if (oidx0 >= out_.dims[0] || oidx1 >= out_.dims[1]) return;
 
@@ -80,8 +75,8 @@ class wrapCreateKernel {
         // / stride Each previous index has the value appear "stride" locations
         // earlier We work our way back from the last index
 
-        const int x_end = fmin(pidx0 / sx_, nx_ - 1);
-        const int y_end = fmin(pidx1 / sy_, ny_ - 1);
+        const int x_end = sycl::min(pidx0 / sx_, nx_ - 1);
+        const int y_end = sycl::min(pidx1 / sy_, ny_ - 1);
 
         const int x_off = pidx0 - sx_ * x_end;
         const int y_off = pidx1 - sy_ * y_end;

@@ -473,7 +473,7 @@ TEST(DeviceId, Same) {
 
 TEST(DeviceId, Different) {
     int ndevices = getDeviceCount();
-    if (ndevices < 2) return;
+    if (ndevices < 2) GTEST_SKIP() << "Skipping mult-GPU test";
     int id0 = getDevice();
     int id1 = (id0 + 1) % ndevices;
 
@@ -491,7 +491,8 @@ TEST(DeviceId, Different) {
 
         af_array c;
         af_err err = af_matmul(&c, a.get(), b.get(), AF_MAT_NONE, AF_MAT_NONE);
-        ASSERT_EQ(err, AF_ERR_DEVICE);
+        af::sync();
+        ASSERT_EQ(err, AF_SUCCESS);
     }
 
     setDevice(id1);
@@ -502,12 +503,12 @@ TEST(DeviceId, Different) {
 
 TEST(Device, empty) {
     array a = array();
-    ASSERT_EQ(a.device<float>() == NULL, 1);
+    ASSERT_EQ(a.device<float>(), nullptr);
 }
 
 TEST(Device, JIT) {
     array a = constant(1, 5, 5);
-    ASSERT_EQ(a.device<float>() != NULL, 1);
+    ASSERT_NE(a.device<float>(), nullptr);
 }
 
 TYPED_TEST(Array, Scalar) {
@@ -520,7 +521,7 @@ TYPED_TEST(Array, Scalar) {
 
     a.host((void *)gold.data());
 
-    EXPECT_EQ(true, gold[0] == a.scalar<TypeParam>());
+    EXPECT_EQ(gold[0], a.scalar<TypeParam>());
 }
 
 TEST(Array, ScalarTypeMismatch) {
@@ -656,4 +657,22 @@ TEST(Array, InitializerListFixDim4) {
                           3.14f, 3.14f, 3.14f, 3.14f};
     af::array b{dim4(3, 3), data.data()};
     ASSERT_ARRAYS_EQ(constant(3.14, 3, 3), b);
+}
+
+TEST(Array, OtherDevice) {
+    if (af::getDeviceCount() == 1) GTEST_SKIP() << "Single device. Skipping";
+    af::setDevice(0);
+    af::info();
+    af::array a = constant(3, 5, 5);
+    a.eval();
+    af::setDevice(1);
+    af::info();
+    af::array b = constant(2, 5, 5);
+    b.eval();
+
+    af::array c = a + b;
+    af::eval(c);
+    af::sync();
+    af::setDevice(0);
+    ASSERT_ARRAYS_EQ(constant(5, 5, 5), c);
 }

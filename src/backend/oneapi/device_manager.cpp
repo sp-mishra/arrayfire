@@ -23,12 +23,7 @@
 #include <af/oneapi.h>
 #include <af/version.h>
 
-#include <sycl/context.hpp>
-#include <sycl/device.hpp>
-#include <sycl/exception.hpp>
-#include <sycl/exception_list.hpp>
-#include <sycl/platform.hpp>
-#include <sycl/queue.hpp>
+#include <sycl/sycl.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -57,11 +52,26 @@ namespace oneapi {
 
 static inline bool compare_default(const unique_ptr<sycl::device>& ldev,
                                    const unique_ptr<sycl::device>& rdev) {
-    // TODO: update sorting criteria
-    // select according to something applicable to oneapi backend
-    auto l_mem = ldev->get_info<sycl::info::device::global_mem_size>();
-    auto r_mem = rdev->get_info<sycl::info::device::global_mem_size>();
-    return l_mem > r_mem;
+    using sycl::info::device_type;
+
+    auto ldt = ldev->get_info<sycl::info::device::device_type>();
+    auto rdt = rdev->get_info<sycl::info::device::device_type>();
+
+    if (ldt == rdt) {
+        auto l_mem = ldev->get_info<sycl::info::device::global_mem_size>();
+        auto r_mem = rdev->get_info<sycl::info::device::global_mem_size>();
+        return l_mem > r_mem;
+    } else {
+        if (ldt == device_type::gpu)
+            return true;
+        else if (rdt == device_type::gpu)
+            return false;
+        else if (ldt == device_type::cpu)
+            return true;
+        else if (rdt == device_type::cpu)
+            return false;
+    }
+    return false;
 }
 
 auto arrayfire_exception_handler(sycl::exception_list exceptions) {
@@ -94,13 +104,7 @@ DeviceManager::DeviceManager()
     // Iterate through platforms, get all available devices and store them
     for (auto& platform : platforms) {
         vector<sycl::device> current_devices;
-        try {
-            current_devices = platform.get_devices();
-        } catch (sycl::exception& err) {
-            printf("DeviceManager::DeviceManager() exception: %s\n",
-                   err.what());
-            throw;
-        }
+        current_devices = platform.get_devices();
         AF_TRACE("Found {} devices on platform {}", current_devices.size(),
                  platform.get_info<sycl::info::platform::name>());
 
@@ -163,13 +167,50 @@ DeviceManager::DeviceManager()
 
     bool default_device_set = false;
     string deviceENV        = getEnvVar("AF_ONEAPI_DEFAULT_DEVICE");
+
     if (!deviceENV.empty()) {
-        // TODO: handle default device from env variable
+        stringstream s(deviceENV);
+        int def_device = -1;
+        s >> def_device;
+        if (def_device >= static_cast<int>(mQueues.size()) ||
+            def_device >= static_cast<int>(DeviceManager::MAX_DEVICES)) {
+            AF_TRACE(
+                "AF_ONEAPI_DEFAULT_DEVICE ({}) \
+                   is out of range, Setting default device to 0",
+                def_device);
+            def_device = 0;
+        } else {
+            setActiveContext(def_device);
+            default_device_set = true;
+        }
     }
 
-    deviceENV = getEnvVar("AF_OPENCL_DEFAULT_DEVICE_TYPE");
+    deviceENV = getEnvVar("AF_ONEAPI_DEFAULT_DEVICE_TYPE");
     if (!default_device_set && !deviceENV.empty()) {
-        // TODO: handle default device by type env variable
+        sycl::info::device_type default_device_type =
+            sycl::info::device_type::gpu;
+        if (deviceENV == "CPU") {
+            default_device_type = sycl::info::device_type::cpu;
+        } else if (deviceENV == "ACC") {
+            default_device_type = sycl::info::device_type::accelerator;
+        }
+
+        bool default_device_set = false;
+        for (int i = 0; i < nDevices; i++) {
+            if (mDevices[i]->get_info<sycl::info::device::device_type>() ==
+                default_device_type) {
+                default_device_set = true;
+                AF_TRACE("Setting to first available {}({})", deviceENV, i);
+                setActiveContext(i);
+                break;
+            }
+        }
+        if (!default_device_set) {
+            AF_TRACE(
+                "AF_ONEAPI_DEFAULT_DEVICE_TYPE={} \
+                   is not available, Using default device as 0",
+                deviceENV);
+        }
     }
 
     // Define AF_DISABLE_GRAPHICS with any value to disable initialization
@@ -182,7 +223,7 @@ DeviceManager::DeviceManager()
 
     // TODO: init other needed libraries?
     // blas? program cache?
-    // AF_TRACE("Default device: {}", getActiveDeviceId());
+    AF_TRACE("Default device: {}", getActiveDeviceId());
 }
 
 spdlog::logger* DeviceManager::getLogger() { return logger.get(); }

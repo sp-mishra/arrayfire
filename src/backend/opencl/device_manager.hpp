@@ -105,7 +105,7 @@ class DeviceManager {
 
     friend const cl::Context& getContext();
 
-    friend cl::CommandQueue& getQueue();
+    friend cl::CommandQueue& getQueue(int device_id);
 
     friend cl_command_queue getQueueHandle(int device_id);
 
@@ -138,6 +138,8 @@ class DeviceManager {
     friend cl::Platform& getActivePlatform();
 
     friend afcl::platform getActivePlatformVendor();
+
+    friend bool isDeviceBufferAccessible(int buf_device_id, int execution_id);
 
    public:
     static const int MAX_DEVICES = 32;

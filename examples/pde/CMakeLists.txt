@@ -5,7 +5,7 @@
 # The complete license agreement can be obtained at:
 # http://arrayfire.com/licenses/BSD-3-Clause
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 project(ArrayFire-Example-PDE
   VERSION 3.5.0
   LANGUAGES CXX)
@@ -26,4 +26,9 @@ endif()
 if(ArrayFire_OpenCL_FOUND)
   add_executable(swe_opencl swe.cpp)
   target_link_libraries(swe_opencl ArrayFire::afopencl)
+endif()
+
+if(ArrayFire_oneAPI_FOUND)
+  add_executable(swe_oneapi swe.cpp)
+  target_link_libraries(swe_oneapi ArrayFire::afoneapi)
 endif()

@@ -8,6 +8,7 @@
  ********************************************************/
 
 #include <Array.hpp>
+#include <common/Logger.hpp>
 #include <common/half.hpp>
 #include <common/jit/NodeIterator.hpp>
 #include <copy.hpp>
@@ -54,6 +55,22 @@ template<typename T>
 std::shared_ptr<BufferNode<T>> bufferNodePtr() {
     return std::make_shared<BufferNode<T>>(
         static_cast<af::dtype>(dtype_traits<T>::af_type));
+}
+
+template<typename T>
+void checkAndMigrate(Array<T> &arr) {
+    int arr_id = arr.getDevId();
+    int cur_id = detail::getActiveDeviceId();
+    if (!isDeviceBufferAccessible(arr_id, cur_id)) {
+        static auto getLogger = [&] { return spdlog::get("platform"); };
+        AF_TRACE("Migrating array from {} to {}.", arr_id, cur_id);
+        auto migrated_data = memAlloc<T>(arr.elements());
+        CUDA_CHECK(
+            cudaMemcpyPeerAsync(migrated_data.get(), getDeviceNativeId(cur_id),
+                                arr.get(), getDeviceNativeId(arr_id),
+                                arr.elements() * sizeof(T), getActiveStream()));
+        arr.data.reset(migrated_data.release(), memFree);
+    }
 }
 
 template<typename T>
@@ -253,8 +270,13 @@ Node_ptr Array<T>::getNode() const {
 template<typename T>
 kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
     if (!evalFlag()) { return kJITHeuristics::Pass; }
+    static auto getLogger = [&] { return spdlog::get("jit"); };
     for (Node *n : root_nodes) {
         if (n->getHeight() > static_cast<int>(getMaxJitSize())) {
+            AF_TRACE(
+                "JIT tree evaluated because of tree height exceeds limit: {} > "
+                "{}",
+                n->getHeight(), getMaxJitSize());
             return kJITHeuristics::TreeHeight;
         }
     }
@@ -313,9 +335,14 @@ kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
         // should be checking the amount of memory available to guard
         // this eval
         if (param_size >= max_param_size) {
+            AF_TRACE(
+                "JIT tree evaluated because of kernel parameter size: {} >= {}",
+                param_size, max_param_size);
             return kJITHeuristics::KernelParameterSize;
         }
         if (jitTreeExceedsMemoryPressure(info.total_buffer_size)) {
+            AF_TRACE("JIT tree evaluated because of memory pressure: {}",
+                     info.total_buffer_size);
             return kJITHeuristics::MemoryPressure;
         }
     }
@@ -457,7 +484,8 @@ void Array<T>::setDataDims(const dim4 &new_dims) {
         Array<T> & arr, const void *const data, const size_t bytes);          \
     template void evalMultiple<T>(std::vector<Array<T> *> arrays);            \
     template kJITHeuristics passesJitHeuristics<T>(span<Node *> n);           \
-    template void Array<T>::setDataDims(const dim4 &new_dims);
+    template void Array<T>::setDataDims(const dim4 &new_dims);                \
+    template void checkAndMigrate<T>(Array<T> & arr);
 
 INSTANTIATE(float)
 INSTANTIATE(double)

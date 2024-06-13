@@ -11,7 +11,7 @@
 #include <Param.hpp>
 #include <err_oneapi.hpp>
 
-#include <sycl/buffer.hpp>
+#include <sycl/sycl.hpp>
 
 #include <functional>
 #include <memory>
@@ -38,11 +38,14 @@ inline void generateParamDeclaration(std::stringstream& kerStream, int id,
 
 /// Calls the setArg function to set the arguments for a kernel call
 template<typename T>
-inline int setKernelArguments(
+inline int setBufferKernelArguments(
     int start_id, bool is_linear,
-    std::function<void(int id, const void* ptr, size_t arg_size)>& setArg,
-    const std::shared_ptr<sycl::buffer<T>>& ptr, const AParam<T>& info) {
-    setArg(start_id + 0, static_cast<const void*>(&info), sizeof(Param<T>));
+    std::function<void(int id, const void* ptr, size_t arg_size,
+                       bool is_buffer)>& setArg,
+    const std::shared_ptr<sycl::buffer<T>>& ptr,
+    const AParam<T, sycl::access_mode::read>& info) {
+    setArg(start_id + 0, static_cast<const void*>(&info),
+           sizeof(AParam<T, sycl::access_mode::read>), true);
     return start_id + 2;
 }
 
@@ -60,8 +63,9 @@ inline void generateBufferOffsets(std::stringstream& kerStream, int id,
                   << info_str << ".strides[3] * id3 + (id2 < " << info_str
                   << ".dims[2]) * " << info_str << ".strides[2] * id2 + (id1 < "
                   << info_str << ".dims[1]) * " << info_str
-                  << ".strides[1] * id1 + (id0 < " << info_str
-                  << ".dims[0]) * id0 + " << info_str << ".offset;\n";
+                  << ".strides[1] * id1 + (id0 < " << info_str << ".dims[0]) * "
+                  << info_str << ".strides[0]  * id0 + " << info_str
+                  << ".offset;\n";
     }
 }
 

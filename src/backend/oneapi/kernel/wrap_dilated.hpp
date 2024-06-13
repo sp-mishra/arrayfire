@@ -13,9 +13,11 @@
 #include <common/dispatch.hpp>
 #include <common/kernel_cache.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <kernel/default_config.hpp>
 #include <math.hpp>
 
+#include <sycl/sycl.hpp>
 #include <string>
 #include <vector>
 
@@ -24,22 +26,15 @@ namespace oneapi {
 namespace kernel {
 
 template<typename T>
-using local_accessor = sycl::accessor<T, 1, sycl::access::mode::read_write,
-                                      sycl::access::target::local>;
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
-
-template<typename T>
 class wrapDilatedCreateKernel {
    public:
-    wrapDilatedCreateKernel(write_accessor<T> optrAcc, KParam out,
-                            read_accessor<T> iptrAcc, KParam in, const int wx,
-                            const int wy, const int sx, const int sy,
-                            const int px, const int py, const int dx,
-                            const int dy, const int nx, const int ny,
-                            int groups_x, int groups_y, const bool is_column)
+    wrapDilatedCreateKernel(write_accessor<data_t<T>> optrAcc, KParam out,
+                            read_accessor<data_t<T>> iptrAcc, KParam in,
+                            const int wx, const int wy, const int sx,
+                            const int sy, const int px, const int py,
+                            const int dx, const int dy, const int nx,
+                            const int ny, int groups_x, int groups_y,
+                            const bool is_column)
         : optrAcc_(optrAcc)
         , out_(out)
         , iptrAcc_(iptrAcc)
@@ -69,10 +64,10 @@ class wrapDilatedCreateKernel {
         int oidx0 = it.get_local_id(0) + g.get_local_range(0) * groupId_x;
         int oidx1 = it.get_local_id(1) + g.get_local_range(1) * groupId_y;
 
-        T *optr = optrAcc_.get_pointer() + idx2 * out_.strides[2] +
-                  idx3 * out_.strides[3];
-        T *iptr = iptrAcc_.get_pointer() + idx2 * in_.strides[2] +
-                  idx3 * in_.strides[3] + in_.offset;
+        data_t<T> *optr = optrAcc_.get_pointer() + idx2 * out_.strides[2] +
+                          idx3 * out_.strides[3];
+        const data_t<T> *iptr = iptrAcc_.get_pointer() + idx2 * in_.strides[2] +
+                                idx3 * in_.strides[3] + in_.offset;
 
         if (oidx0 >= out_.dims[0] || oidx1 >= out_.dims[1]) return;
 
@@ -87,12 +82,12 @@ class wrapDilatedCreateKernel {
         // earlier We work our way back from the last index
 
         const int y_start = (pidx1 < eff_wy) ? 0 : (pidx1 - eff_wy) / sy_ + 1;
-        const int y_end   = fmin(pidx1 / sy_ + 1, ny_);
+        const int y_end   = sycl::min(pidx1 / sy_ + 1, ny_);
 
         const int x_start = (pidx0 < eff_wx) ? 0 : (pidx0 - eff_wx) / sx_ + 1;
-        const int x_end   = fmin(pidx0 / sx_ + 1, nx_);
+        const int x_end   = sycl::min(pidx0 / sx_ + 1, nx_);
 
-        T val   = (T)0;
+        compute_t<T> val(0);
         int idx = 1;
 
         for (int y = y_start; y < y_end; y++) {
@@ -117,8 +112,8 @@ class wrapDilatedCreateKernel {
                     idx = dim_end + win_end * in_.strides[1];
                 }
 
-                T ival;
-                ival = (yvalid && xvalid) ? iptr[idx] : (T)0;
+                compute_t<T> ival;
+                ival = (yvalid && xvalid) ? iptr[idx] : compute_t<T>(0);
                 val  = val + ival;
             }
         }
@@ -127,9 +122,9 @@ class wrapDilatedCreateKernel {
     }
 
    private:
-    write_accessor<T> optrAcc_;
+    write_accessor<data_t<T>> optrAcc_;
     KParam out_;
-    read_accessor<T> iptrAcc_;
+    read_accessor<data_t<T>> iptrAcc_;
     KParam in_;
     const int wx_;
     const int wy_;
@@ -164,8 +159,10 @@ void wrap_dilated(Param<T> out, const Param<T> in, const dim_t wx,
 
     auto Q = getQueue();
     Q.submit([&](sycl::handler &h) {
-        sycl::accessor outAcc{*out.data, h, sycl::write_only, sycl::no_init};
-        sycl::accessor inAcc{*in.data, h, sycl::read_only};
+        write_accessor<data_t<T>> outAcc =
+            out.template get_accessor<sycl::access_mode::write>(h);
+        read_accessor<data_t<T>> inAcc =
+            in.template get_accessor<sycl::access_mode::read>(h);
         h.parallel_for(sycl::nd_range{global, local},
                        wrapDilatedCreateKernel<T>(
                            outAcc, out.info, inAcc, in.info, wx, wy, sx, sy, px,

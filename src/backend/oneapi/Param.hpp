@@ -8,20 +8,11 @@
  ********************************************************/
 
 #pragma once
+#include <sycl/sycl.hpp>
 
 #include <kernel/KParam.hpp>
 #include <types.hpp>
-
 #include <af/dim4.hpp>
-
-/// The get_pointer function in the accessor class throws a few warnings in the
-/// 2023.0 release of the library. Review this warning in the future
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsycl-strict"
-#include <sycl/accessor.hpp>
-#pragma clang diagnostic pop
-#include <sycl/buffer.hpp>
-#include <sycl/handler.hpp>
 
 #include <optional>
 
@@ -35,6 +26,9 @@ struct Param {
     Param& operator=(const Param& other) = default;
     Param(const Param& other)            = default;
     Param(Param&& other)                 = default;
+
+    dim_t* dims_ptr() { return info.dims; }
+    dim_t* strides_ptr() { return info.strides; }
 
     // AF_DEPRECATED("Use Array<T>")
     Param() : data(nullptr), info{{0, 0, 0, 0}, {0, 0, 0, 0}, 0} {}
@@ -51,13 +45,11 @@ struct Param {
     ~Param() = default;
 };
 
-template<typename T>
+template<typename T, sycl::access_mode AM>
 struct AParam {
-    std::optional<sycl::accessor<T, 1>> data;
-    std::optional<sycl::accessor<T, 1, sycl::access::mode::read_write,
-                                 sycl::access::target::device,
-                                 sycl::access::placeholder::true_t>>
-        ph;
+    sycl::accessor<T, 1, AM, sycl::target::device,
+                   sycl::access::placeholder::true_t>
+        data;
     af::dim4 dims;
     af::dim4 strides;
     dim_t offset;
@@ -65,36 +57,28 @@ struct AParam {
     AParam(const AParam& other)            = default;
     AParam(AParam&& other)                 = default;
 
+    dim_t* dims_ptr() { return dims.get(); }
+    dim_t* strides_ptr() { return strides.get(); }
+
     // AF_DEPRECATED("Use Array<T>")
-    AParam() : data(), ph(), dims{0, 0, 0, 0}, strides{0, 0, 0, 0}, offset(0) {}
+    AParam() : data(), dims{0, 0, 0, 0}, strides{0, 0, 0, 0}, offset(0) {}
 
     AParam(sycl::buffer<T, 1>& data_, const dim_t dims_[4],
            const dim_t strides_[4], dim_t offset_)
-        : data()
-        , ph(std::make_optional<
-              sycl::accessor<T, 1, sycl::access::mode::read_write,
-                             sycl::access::target::device,
-                             sycl::access::placeholder::true_t>>(data_))
-        , dims(4, dims_)
-        , strides(4, strides_)
-        , offset(offset_) {}
+        : data(data_), dims(4, dims_), strides(4, strides_), offset(offset_) {}
     // AF_DEPRECATED("Use Array<T>")
     AParam(sycl::handler& h, sycl::buffer<T, 1>& data_, const dim_t dims_[4],
            const dim_t strides_[4], dim_t offset_)
-        : data{{data_, h}}
-        , ph(data_)
-        , dims(4, dims_)
-        , strides(4, strides_)
-        , offset(offset_) {}
+        : data(data_), dims(4, dims_), strides(4, strides_), offset(offset_) {
+        require(h);
+    }
 
     template<sycl::access::mode MODE>
     sycl::accessor<data_t<T>, 1, MODE> get_accessor(sycl::handler& h) const {
         return *data;
     }
 
-    void require(sycl::handler& h) {
-        if (!data) { h.require(ph.value()); }
-    }
+    void require(sycl::handler& h) const { h.require(data); }
 
     operator KParam() const {
         return KParam{{dims[0], dims[1], dims[2], dims[3]},

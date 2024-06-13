@@ -18,8 +18,7 @@
 #include <types.hpp>
 #include <af/dim4.hpp>
 
-#include <sycl/builtins.hpp>
-#include <sycl/usm.hpp>
+#include <sycl/sycl.hpp>
 
 #include <utility>
 
@@ -62,78 +61,59 @@ template<typename T>
 // unique_ptr<int, function<void(int *)>> memAlloc(
 std::unique_ptr<sycl::buffer<T>, std::function<void(sycl::buffer<T> *)>>
 memAlloc(const size_t &elements) {
-    return unique_ptr<sycl::buffer<T>, function<void(sycl::buffer<T> *)>>(
-        new sycl::buffer<T>(sycl::range(elements)), bufferFree<T>);
+    if (elements) {
+        dim4 dims(elements);
+
+        // The alloc function returns a pointer to a buffer<std::byte> object.
+        // We need to reinterpret that object into buffer<T> while keeping the
+        // same pointer value for memory accounting purposes. We acheive this
+        // assigning the renterpreted buffer back into the original pointer.
+        // This would delete the buffer<std::byte> object and replace it with
+        // the buffer<T> object. We do the reverse in the memFree function
+        auto *ptr = static_cast<sycl::buffer<std::byte> *>(
+            memoryManager().alloc(false, 1, dims.get(), sizeof(T)));
+        sycl::buffer<T> *optr = static_cast<sycl::buffer<T> *>((void *)ptr);
+        size_t bytes          = ptr->byte_size();
+
+        // TODO(umar): This could be a DANGEROUS function becasue we are calling
+        // delete on the reniterpreted buffer<T> instead of the orignal
+        // buffer<byte> object
+        *optr = ptr->template reinterpret<T>(sycl::range(bytes / sizeof(T)));
+        return unique_ptr<sycl::buffer<T>, function<void(sycl::buffer<T> *)>>(
+            optr, memFree<T>);
+    } else {
+        return unique_ptr<sycl::buffer<T>, function<void(sycl::buffer<T> *)>>(
+            nullptr, memFree<T>);
+    }
 }
 
 void *memAllocUser(const size_t &bytes) {
-    ONEAPI_NOT_SUPPORTED("memAllocUser Not supported");
-    return nullptr;
-
-    // dim4 dims(bytes);
-    // void *ptr = memoryManager().alloc(true, 1, dims.get(), 1);
-    // auto buf  = static_cast<cl_mem>(ptr);
-    // return new cl::Buffer(buf, true);
-}
-
-void memFree(void *ptr) {
-    ONEAPI_NOT_SUPPORTED("memFree Not supported");
-
-    // cl::Buffer *buf = reinterpret_cast<cl::Buffer *>(ptr);
-    // cl_mem mem      = static_cast<cl_mem>((*buf)());
-    // delete buf;
-    // return memoryManager().unlock(static_cast<void *>(mem), false);
-}
-
-void memFreeUser(void *ptr) {
-    ONEAPI_NOT_SUPPORTED("memFreeUser Not supported");
-
-    // cl::Buffer *buf = static_cast<cl::Buffer *>(ptr);
-    // cl_mem mem      = (*buf)();
-    // delete buf;
-    // memoryManager().unlock(mem, true);
+    dim4 dims(bytes);
+    void *ptr = memoryManager().alloc(true, 1, dims.get(), 1);
+    return ptr;
 }
 
 template<typename T>
-sycl::buffer<T> *bufferAlloc(const size_t &bytes) {
-    ONEAPI_NOT_SUPPORTED("bufferAlloc Not supported");
-    return nullptr;
-
-    // dim4 dims(bytes);
-    // if (bytes) {
-    //     void *ptr       = memoryManager().alloc(false, 1, dims.get(), 1);
-    //     cl_mem mem      = static_cast<cl_mem>(ptr);
-    //     cl::Buffer *buf = new cl::Buffer(mem, true);
-    //     return buf;
-    // } else {
-    //     return nullptr;
-    // }
+void memFree(sycl::buffer<T> *ptr) {
+    if (ptr) {
+        sycl::buffer<std::byte> *optr =
+            static_cast<sycl::buffer<std::byte> *>((void *)ptr);
+        size_t bytes = ptr->byte_size();
+        *optr        = ptr->template reinterpret<std::byte>(sycl::range(bytes));
+        memoryManager().unlock(optr, false);
+    }
 }
 
-template<typename T>
-void bufferFree(sycl::buffer<T> *buf) {
-    if (buf) { delete buf; }
-    // if (buf) {
-    //     cl_mem mem = (*buf)();
-    //     delete buf;
-    //     memoryManager().unlock(static_cast<void *>(mem), false);
-    // }
-}
+void memFreeUser(void *ptr) { memoryManager().unlock(ptr, true); }
 
 template<typename T>
 void memLock(const sycl::buffer<T> *ptr) {
-    ONEAPI_NOT_SUPPORTED("memLock Not supported");
-
-    // cl_mem mem = static_cast<cl_mem>((*ptr)());
-    // memoryManager().userLock(static_cast<void *>(mem));
+    memoryManager().userLock(static_cast<const void *>(ptr));
 }
 
 template<typename T>
 void memUnlock(const sycl::buffer<T> *ptr) {
-    ONEAPI_NOT_SUPPORTED("memUnlock Not supported");
-
-    // cl_mem mem = static_cast<cl_mem>((*ptr)());
-    // memoryManager().userUnlock(static_cast<void *>(mem));
+    memoryManager().userUnlock(static_cast<const void *>(ptr));
 }
 
 bool isLocked(const void *ptr) {
@@ -162,7 +142,6 @@ void pinnedFree(void *ptr) { pinnedMemoryManager().unlock(ptr, false); }
                              std::function<void(sycl::buffer<T> *)>> \
     memAlloc(const size_t &elements);                                \
     template T *pinnedAlloc(const size_t &elements);                 \
-    template void bufferFree(sycl::buffer<T> *buf);                  \
     template void memLock(const sycl::buffer<T> *buf);               \
     template void memUnlock(const sycl::buffer<T> *buf);
 
@@ -179,31 +158,19 @@ INSTANTIATE(uintl)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(arrayfire::common::half)
+INSTANTIATE(int64_t)
 
 template<>
 void *pinnedAlloc<void>(const size_t &elements) {
-    ONEAPI_NOT_SUPPORTED("pinnedAlloc Not supported");
-
-    // // TODO: make pinnedAlloc aware of array shapes
-    // dim4 dims(elements);
-    // void *ptr = pinnedMemoryManager().alloc(false, 1, dims.get(), sizeof(T));
-    return static_cast<void *>(nullptr);
+    // TODO: make pinnedAlloc aware of array shapes
+    dim4 dims(elements);
+    void *ptr = pinnedMemoryManager().alloc(false, 1, dims.get(), 1);
+    return ptr;
 }
 
 Allocator::Allocator() { logger = common::loggerFactory("mem"); }
 
-void Allocator::shutdown() {
-    ONEAPI_NOT_SUPPORTED("Allocator::shutdown Not supported");
-
-    // for (int n = 0; n < opencl::getDeviceCount(); n++) {
-    //     try {
-    //         opencl::setDevice(n);
-    //         shutdownMemoryManager();
-    //     } catch (const AfError &err) {
-    //         continue;  // Do not throw any errors while shutting down
-    //     }
-    // }
-}
+void Allocator::shutdown() { shutdownMemoryManager(); }
 
 int Allocator::getActiveDeviceId() { return oneapi::getActiveDeviceId(); }
 
@@ -212,33 +179,16 @@ size_t Allocator::getMaxMemorySize(int id) {
 }
 
 void *Allocator::nativeAlloc(const size_t bytes) {
-    ONEAPI_NOT_SUPPORTED("Allocator::nativeAlloc Not supported");
-    return nullptr;
-
-    // cl_int err = CL_SUCCESS;
-    // auto ptr   = static_cast<void *>(clCreateBuffer(
-    //     getContext()(), CL_MEM_READ_WRITE,  // NOLINT(hicpp-signed-bitwise)
-    //     bytes, nullptr, &err));
-
-    // if (err != CL_SUCCESS) {
-    //     auto str = fmt::format("Failed to allocate device memory of size {}",
-    //                            bytesToString(bytes));
-    //     AF_ERROR(str, AF_ERR_NO_MEM);
-    // }
-
-    // AF_TRACE("nativeAlloc: {} {}", bytesToString(bytes), ptr);
-    // return ptr;
+    auto *ptr = new sycl::buffer<std::byte>(sycl::range(bytes));
+    AF_TRACE("nativeAlloc: {} {}", bytesToString(bytes),
+             static_cast<void *>(ptr));
+    return ptr;
 }
 
 void Allocator::nativeFree(void *ptr) {
-    ONEAPI_NOT_SUPPORTED("Allocator::nativeFree Not supported");
-
-    // cl_mem buffer = static_cast<cl_mem>(ptr);
-    // AF_TRACE("nativeFree:          {}", ptr);
-    // cl_int err = clReleaseMemObject(buffer);
-    // if (err != CL_SUCCESS) {
-    //     AF_ERROR("Failed to release device memory.", AF_ERR_RUNTIME);
-    // }
+    auto *buf = static_cast<sycl::buffer<std::byte> *>(ptr);
+    AF_TRACE("nativeFree:          {}", ptr);
+    delete buf;
 }
 
 AllocatorPinned::AllocatorPinned() { logger = common::loggerFactory("mem"); }

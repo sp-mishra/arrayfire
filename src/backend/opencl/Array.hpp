@@ -41,6 +41,13 @@ using af::dim4;
 template<typename T>
 class Array;
 
+/// Checks if the Array object can be migrated to the current device and if not,
+/// an error is thrown
+///
+/// \param[in] arr The Array that will be checked.
+template<typename T>
+void checkAndMigrate(Array<T> &arr);
+
 template<typename T>
 void evalMultiple(std::vector<Array<T> *> arrays);
 
@@ -161,6 +168,8 @@ class Array {
     explicit Array(const af::dim4 &dims, const T *const in_data);
     explicit Array(const af::dim4 &dims, cl_mem mem, size_t offset, bool copy);
 
+    std::shared_ptr<cl::Buffer> getData() const { return data; }
+
    public:
     Array(const Array<T> &other) = default;
 
@@ -250,8 +259,6 @@ class Array {
 
     dim_t getOffset() const { return info.getOffset(); }
 
-    std::shared_ptr<cl::Buffer> getData() const { return data; }
-
     dim4 getDataDims() const { return data_dims; }
 
     void setDataDims(const dim4 &new_dims);
@@ -323,6 +330,7 @@ class Array {
     friend void destroyArray<T>(Array<T> *arr);
     friend void *getDevicePtr<T>(const Array<T> &arr);
     friend void *getRawPtr<T>(const Array<T> &arr);
+    friend void checkAndMigrate<T>(Array<T> &arr);
 };
 
 }  // namespace opencl

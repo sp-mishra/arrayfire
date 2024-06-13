@@ -14,6 +14,7 @@
 #include <types.hpp>
 #include <af/defines.h>
 
+#include <nonstd/span.hpp>
 #include <algorithm>
 #include <array>
 #include <functional>
@@ -32,6 +33,15 @@ enum class kJITHeuristics {
 
 namespace arrayfire {
 namespace common {
+
+enum class kNodeType {
+    Generic = 0,
+    Scalar  = 1,
+    Buffer  = 2,
+    Nary    = 3,
+    Shift   = 4,
+};
+
 class Node;
 }  // namespace common
 }  // namespace arrayfire
@@ -122,13 +132,17 @@ class Node {
     std::array<Node_ptr, kMaxChildren> m_children;
     af::dtype m_type;
     int m_height;
+    kNodeType m_node_type = kNodeType::Generic;
 
     template<typename T>
     friend class NodeIterator;
     Node() = default;
     Node(const af::dtype type, const int height,
-         const std::array<Node_ptr, kMaxChildren> children)
-        : m_children(children), m_type(type), m_height(height) {
+         const std::array<Node_ptr, kMaxChildren> children, kNodeType node_type)
+        : m_children(children)
+        , m_type(type)
+        , m_height(height)
+        , m_node_type(node_type) {
         static_assert(std::is_nothrow_move_assignable<Node>::value,
                       "Node is not move assignable");
     }
@@ -225,10 +239,10 @@ class Node {
     ///
     /// \returns the next index that will need to be set in the kernl. This
     ///          is usually start_id + the number of times setArg is called
-    virtual int setArgs(
-        int start_id, bool is_linear,
-        std::function<void(int id, const void *ptr, size_t arg_size)> setArg)
-        const {
+    virtual int setArgs(int start_id, bool is_linear,
+                        std::function<void(int id, const void *ptr,
+                                           size_t arg_size, bool is_buffer)>
+                            setArg) const {
         UNUSED(is_linear);
         UNUSED(setArg);
         return start_id;
@@ -249,13 +263,16 @@ class Node {
     virtual size_t getBytes() const { return 0; }
 
     // Returns true if this node is a Buffer
-    virtual bool isBuffer() const { return false; }
+    bool isBuffer() const { return m_node_type == kNodeType::Buffer; }
 
     // Returns true if this node is a Scalar
-    virtual bool isScalar() const { return false; }
+    bool isScalar() const { return m_node_type == kNodeType::Scalar; }
 
     /// Returns true if the buffer is linear
     virtual bool isLinear(const dim_t dims[4]) const;
+
+    /// Returns the node type
+    kNodeType getNodeType() const { return m_node_type; }
 
     /// Returns the type
     af::dtype getType() const { return m_type; }
@@ -314,9 +331,79 @@ std::string getFuncName(const std::vector<Node *> &output_nodes,
                         const bool is_linear, const bool loop0,
                         const bool loop1, const bool loop2, const bool loop3);
 
+/// Returns true if the \p ptr is a Buffer Node
 auto isBuffer(const Node &ptr) -> bool;
 
+/// Returns true if the \p ptr is a Scalar Node
 auto isScalar(const Node &ptr) -> bool;
+
+/// Returns true if \p node is a Buffer or a Shift node
+auto isBufferOrShift(const Node_ptr &node) -> bool;
+
+template<typename T>
+inline void applyShifts(std::array<int, 4> &shifts, nonstd::span<T> dims) {
+    std::array<T, 4> out;
+    for (size_t i = 0; i < shifts.size(); i++) { out[i] = dims[shifts[i]]; }
+    std::copy(begin(out), std::end(out), std::begin(dims));
+}
+
+template<typename ArrayT>
+inline std::array<int, 4> compressArray(ArrayT dims) {
+    std::array<int, 4> shifts{0, 1, 2, 3};
+    bool changed;
+    do {
+        changed = false;
+        for (int i = 0; i < AF_MAX_DIMS - 1; i++) {
+            if (dims[i] == 1 && dims[i + 1] != 1) {
+                std::swap(dims[i], dims[i + 1]);
+                std::swap(shifts[i], shifts[i + 1]);
+                changed = true;
+            }
+        }
+    } while (changed);
+    return shifts;
+}
+
+/// Removes empty columns from output and the other node pointers in \p nodes
+template<typename ParamT, typename BufferNodeT, typename ShiftNodeT>
+void removeEmptyDimensions(nonstd::span<ParamT> outputs,
+                           nonstd::span<Node_ptr> nodes) {
+    dim_t *outDims{outputs[0].dims_ptr()};
+    dim_t *outStrides{outputs[0].strides_ptr()};
+    auto shifts = compressArray(outDims);
+    applyShifts<dim_t>(shifts, {outStrides, AF_MAX_DIMS});
+    for (auto nodeIt{begin(nodes)}, endIt{end(nodes)};
+         (nodeIt = find_if(nodeIt, endIt, isBufferOrShift)) != endIt;
+         ++nodeIt) {
+        switch ((*nodeIt)->getNodeType()) {
+            case kNodeType::Buffer: {
+                BufferNodeT *buf{static_cast<BufferNodeT *>(nodeIt->get())};
+                applyShifts<dim_t>(shifts,
+                                   {buf->m_param.dims_ptr(), AF_MAX_DIMS});
+                applyShifts<dim_t>(shifts,
+                                   {buf->m_param.strides_ptr(), AF_MAX_DIMS});
+            } break;
+            case kNodeType::Shift: {
+                ShiftNodeT &shiftNode{
+                    *static_cast<ShiftNodeT *>(nodeIt->get())};
+                BufferNodeT &buf{shiftNode.getBufferNode()};
+                applyShifts<dim_t>(shifts,
+                                   {buf.m_param.dims_ptr(), AF_MAX_DIMS});
+                applyShifts<dim_t>(shifts,
+                                   {buf.m_param.strides_ptr(), AF_MAX_DIMS});
+
+                auto &node_shifts = shiftNode.getShifts();
+                applyShifts<int>(shifts, node_shifts);
+            } break;
+            default: break;
+        }
+    }
+    std::for_each(
+        std::begin(outputs) + 1, std::end(outputs), [&shifts](ParamT &output) {
+            applyShifts<dim_t>(shifts, {output.dims_ptr(), AF_MAX_DIMS});
+            applyShifts<dim_t>(shifts, {output.strides_ptr(), AF_MAX_DIMS});
+        });
+}
 
 }  // namespace common
 }  // namespace arrayfire

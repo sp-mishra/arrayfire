@@ -34,6 +34,13 @@ using af::dim4;
 template<typename T>
 class Array;
 
+/// Checks if the Array object can be migrated to the current device and if not,
+/// an error is thrown
+///
+/// \param[in] arr The Array that will be checked.
+template<typename T>
+void checkAndMigrate(Array<T> &arr);
+
 template<typename T>
 void evalNodes(Param<T> out, common::Node *node);
 
@@ -156,6 +163,8 @@ class Array {
     Array(Param<T> &tmp, bool owner);
     Array(const af::dim4 &dims, common::Node_ptr n);
 
+    std::shared_ptr<T> getData() const { return data; }
+
    public:
     Array(const Array<T> &other) = default;
 
@@ -227,7 +236,6 @@ class Array {
     void eval() const;
 
     dim_t getOffset() const { return info.getOffset(); }
-    std::shared_ptr<T> getData() const { return data; }
 
     dim4 getDataDims() const { return data_dims; }
 
@@ -297,6 +305,7 @@ class Array {
     friend void destroyArray<T>(Array<T> *arr);
     friend void *getDevicePtr<T>(const Array<T> &arr);
     friend void *getRawPtr<T>(const Array<T> &arr);
+    friend void checkAndMigrate<T>(Array<T> &arr);
 };
 
 }  // namespace cuda

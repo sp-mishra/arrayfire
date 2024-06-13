@@ -1,3 +1,4 @@
+
 /*******************************************************
  * Copyright (c) 2022, ArrayFire
  * All rights reserved.
@@ -15,13 +16,13 @@
 #include <common/half.hpp>
 #include <debug_oneapi.hpp>
 #include <err_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <kernel/default_config.hpp>
 #include <kernel/reduce_config.hpp>
 #include <math.hpp>
 #include <memory.hpp>
 
-#include <sycl/builtins.hpp>
-#include <sycl/group_algorithm.hpp>
+#include <sycl/sycl.hpp>
 
 #include <memory>
 #include <vector>
@@ -29,29 +30,7 @@
 namespace arrayfire {
 namespace oneapi {
 
-/*
-TODO: port half
-__device__ auto operator*(float lhs, __half rhs) -> __half {
-    return __float2half(lhs * __half2float(rhs));
-}
-
-__device__ auto operator/(__half lhs, float rhs) -> __half {
-    return __float2half(__half2float(lhs) / rhs);
-}
-*/
-
 namespace kernel {
-
-template<typename T, int dimensions>
-using local_accessor =
-    sycl::accessor<T, dimensions, sycl::access::mode::read_write,
-                   sycl::access::target::local>;
-
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 template<typename To, typename Tw>
 void stable_mean(To *lhs, Tw *l_wt, To rhs, Tw r_wt) {
@@ -72,9 +51,10 @@ class meanDimKernelSMEM {
                       write_accessor<Tw> owt, KParam owInfo,
                       read_accessor<Ti> in, KParam iInfo, read_accessor<Tw> iwt,
                       KParam iwInfo, uint groups_x, uint groups_y,
-                      uint offset_dim, local_accessor<compute_t<To>, 1> s_val,
-                      local_accessor<compute_t<Tw>, 1> s_idx, bool input_weight,
-                      bool output_weight)
+                      uint offset_dim,
+                      sycl::local_accessor<compute_t<To>, 1> s_val,
+                      sycl::local_accessor<compute_t<Tw>, 1> s_idx,
+                      bool input_weight, bool output_weight)
         : out_(out)
         , owt_(owt)
         , in_(in)
@@ -111,7 +91,7 @@ class meanDimKernelSMEM {
         To *optr       = out_.get_pointer();
 
         uint ooffset = ids[3] * oInfo_.strides[3] + ids[2] * oInfo_.strides[2] +
-                       ids[1] * oInfo_.strides[1] + ids[0];
+                       ids[1] * oInfo_.strides[1] + ids[0] + oInfo_.offset;
         // There is only one element per block for out
         // There are blockDim.y elements per block for in
         // Hence increment ids[dim] just after offseting out and before
@@ -122,11 +102,11 @@ class meanDimKernelSMEM {
         ids[dim]                = ids[dim] * g.get_local_range(1) + lidy;
 
         uint ioffset = ids[3] * iInfo_.strides[3] + ids[2] * iInfo_.strides[2] +
-                       ids[1] * iInfo_.strides[1] + ids[0];
+                       ids[1] * iInfo_.strides[1] + ids[0] + iInfo_.offset;
         iptr += ioffset;
 
-        const Tw *iwptr;
-        Tw *owptr;
+        const Tw *iwptr = nullptr;
+        Tw *owptr       = nullptr;
 
         if (output_weight_) owptr = owt_.get_pointer() + ooffset;
         if (input_weight_) iwptr = iwt_.get_pointer() + ioffset;
@@ -145,7 +125,7 @@ class meanDimKernelSMEM {
 
         if (is_valid && id_dim_in < iInfo_.dims[dim]) {
             val = transform(*iptr);
-            if (iwptr != NULL) {
+            if (iwptr) {
                 weight = *iwptr;
             } else {
                 weight = (Tw)1;
@@ -153,14 +133,14 @@ class meanDimKernelSMEM {
         }
 
         const uint id_dim_in_start =
-            id_dim_in + offset_dim_ * g.get_local_range(0);
+            id_dim_in + offset_dim_ * g.get_local_range(1);
 
         for (int id = id_dim_in_start; is_valid && (id < iInfo_.dims[dim]);
-             id += offset_dim_ * g.get_local_range(0)) {
-            iptr = iptr + offset_dim_ * g.get_local_range(0) * istride_dim;
+             id += offset_dim_ * g.get_local_range(1)) {
+            iptr = iptr + offset_dim_ * g.get_local_range(1) * istride_dim;
             if (input_weight_) {
                 iwptr =
-                    iwptr + offset_dim_ * g.get_local_range(0) * istride_dim;
+                    iwptr + offset_dim_ * g.get_local_range(1) * istride_dim;
                 stable_mean(&val, &weight, transform(*iptr),
                             compute_t<Tw>(*iwptr));
             } else {
@@ -214,8 +194,8 @@ class meanDimKernelSMEM {
     read_accessor<Tw> iwt_;
     KParam oInfo_, owInfo_, iInfo_, iwInfo_;
     const uint groups_x_, groups_y_, offset_dim_;
-    local_accessor<compute_t<To>, 1> s_val_;
-    local_accessor<compute_t<Tw>, 1> s_idx_;
+    sycl::local_accessor<compute_t<To>, 1> s_val_;
+    sycl::local_accessor<compute_t<Tw>, 1> s_idx_;
     bool input_weight_, output_weight_;
 };
 
@@ -227,13 +207,16 @@ void mean_dim_launcher(Param<To> out, Param<Tw> owt, Param<Ti> in,
     sycl::range<2> global(blocks_dim[0] * blocks_dim[2] * local[0],
                           blocks_dim[1] * blocks_dim[3] * local[1]);
 
-    sycl::buffer<Tw, 1> empty(sycl::range<1>{1});
+    auto empty  = memAlloc<Tw>(1);
+    auto oempty = memAlloc<Tw>(1);
     getQueue().submit([&](sycl::handler &h) {
         write_accessor<To> out_acc{*out.data, h};
         read_accessor<Ti> in_acc{*in.data, h};
 
-        auto s_val = local_accessor<compute_t<To>, 1>(THREADS_PER_BLOCK, h);
-        auto s_idx = local_accessor<compute_t<Tw>, 1>(THREADS_PER_BLOCK, h);
+        auto s_val =
+            sycl::local_accessor<compute_t<To>, 1>(THREADS_PER_BLOCK, h);
+        auto s_idx =
+            sycl::local_accessor<compute_t<Tw>, 1>(THREADS_PER_BLOCK, h);
 
         bool input_weight = ((iwt.info.dims[0] * iwt.info.dims[1] *
                               iwt.info.dims[2] * iwt.info.dims[3]) != 0);
@@ -241,8 +224,8 @@ void mean_dim_launcher(Param<To> out, Param<Tw> owt, Param<Ti> in,
         bool output_weight = ((owt.info.dims[0] * owt.info.dims[1] *
                                owt.info.dims[2] * owt.info.dims[3]) != 0);
 
-        write_accessor<Tw> owt_acc{(output_weight) ? *owt.data : empty, h};
-        read_accessor<Tw> iwt_acc{(input_weight) ? *iwt.data : empty, h};
+        write_accessor<Tw> owt_acc{(output_weight) ? *owt.data : *oempty, h};
+        read_accessor<Tw> iwt_acc{(input_weight) ? *iwt.data : *empty, h};
 
         switch (threads_y) {
             case 8:
@@ -328,8 +311,8 @@ class meanFirstKernelSMEM {
                         read_accessor<Tw> iwt, KParam iwInfo, const uint DIMX,
                         const uint groups_x, const uint groups_y,
                         const uint repeat,
-                        local_accessor<compute_t<To>, 1> s_val,
-                        local_accessor<compute_t<Tw>, 1> s_idx,
+                        sycl::local_accessor<compute_t<To>, 1> s_val,
+                        sycl::local_accessor<compute_t<Tw>, 1> s_idx,
                         bool input_weight, bool output_weight)
         : out_(out)
         , owt_(owt)
@@ -365,19 +348,21 @@ class meanFirstKernelSMEM {
         To *optr       = out_.get_pointer();
 
         iptr += wid * iInfo_.strides[3] + zid * iInfo_.strides[2] +
-                yid * iInfo_.strides[1];
+                yid * iInfo_.strides[1] + iInfo_.offset;
         optr += wid * oInfo_.strides[3] + zid * oInfo_.strides[2] +
-                yid * oInfo_.strides[1];
+                yid * oInfo_.strides[1] + oInfo_.offset;
 
-        const Tw *iwptr;
-        Tw *owptr;
+        const Tw *iwptr = nullptr;
+        Tw *owptr       = nullptr;
         if (input_weight_)
             iwptr = iwt_.get_pointer() + wid * iwInfo_.strides[3] +
-                    zid * iwInfo_.strides[2] + yid * iwInfo_.strides[1];
+                    zid * iwInfo_.strides[2] + yid * iwInfo_.strides[1] +
+                    iwInfo_.offset;
 
         if (output_weight_)
-            owptr = owt_.get_pointer() + wid * oInfo_.strides[3] +
-                    zid * oInfo_.strides[2] + yid * oInfo_.strides[1];
+            owptr = owt_.get_pointer() + wid * owInfo_.strides[3] +
+                    zid * owInfo_.strides[2] + yid * owInfo_.strides[1] +
+                    owInfo_.offset;
 
         bool cond = (yid < iInfo_.dims[1] && zid < iInfo_.dims[2] &&
                      wid < iInfo_.dims[3]);
@@ -486,8 +471,8 @@ class meanFirstKernelSMEM {
     read_accessor<Tw> iwt_;
     KParam oInfo_, owInfo_, iInfo_, iwInfo_;
     const uint DIMX_, groups_x_, groups_y_, repeat_;
-    local_accessor<compute_t<To>, 1> s_val_;
-    local_accessor<compute_t<Tw>, 1> s_idx_;
+    sycl::local_accessor<compute_t<To>, 1> s_val_;
+    sycl::local_accessor<compute_t<Tw>, 1> s_idx_;
     bool input_weight_, output_weight_;
 };
 
@@ -501,13 +486,16 @@ void mean_first_launcher(Param<To> out, Param<Tw> owt, Param<Ti> in,
 
     uint repeat = divup(in.info.dims[0], (groups_x * threads_x));
 
-    sycl::buffer<Tw, 1> empty(sycl::range<1>{1});
+    auto empty  = memAlloc<Tw>(1);
+    auto oempty = memAlloc<Tw>(1);
     getQueue().submit([&](sycl::handler &h) {
         write_accessor<To> out_acc{*out.data, h};
         read_accessor<Ti> in_acc{*in.data, h};
 
-        auto s_val = local_accessor<compute_t<To>, 1>(THREADS_PER_BLOCK, h);
-        auto s_idx = local_accessor<compute_t<Tw>, 1>(THREADS_PER_BLOCK, h);
+        auto s_val =
+            sycl::local_accessor<compute_t<To>, 1>(THREADS_PER_BLOCK, h);
+        auto s_idx =
+            sycl::local_accessor<compute_t<Tw>, 1>(THREADS_PER_BLOCK, h);
 
         bool input_weight = ((iwt.info.dims[0] * iwt.info.dims[1] *
                               iwt.info.dims[2] * iwt.info.dims[3]) != 0);
@@ -515,8 +503,8 @@ void mean_first_launcher(Param<To> out, Param<Tw> owt, Param<Ti> in,
         bool output_weight = ((owt.info.dims[0] * owt.info.dims[1] *
                                owt.info.dims[2] * owt.info.dims[3]) != 0);
 
-        write_accessor<Tw> owt_acc{(output_weight) ? *owt.data : empty, h};
-        read_accessor<Tw> iwt_acc{(input_weight) ? *iwt.data : empty, h};
+        write_accessor<Tw> owt_acc{(output_weight) ? *owt.data : *oempty, h};
+        read_accessor<Tw> iwt_acc{(input_weight) ? *iwt.data : *empty, h};
 
         h.parallel_for(
             sycl::nd_range<2>(global, local),
@@ -620,66 +608,46 @@ T mean_all_weighted(Param<T> in, Param<Tw> iwt) {
         mean_first_launcher<T, Tw, T>(tmpOut, tmpWt, in, iwt, blocks_x,
                                       blocks_y, threads_x);
 
-        std::vector<T> h_ptr(tmp_elements);
-        std::vector<Tw> h_wptr(tmp_elements);
-        sycl::buffer hBuffer(h_ptr.data(), {tmp_elements},
-                             {sycl::property::buffer::use_host_ptr()});
-        sycl::buffer hwBuffer(h_wptr.data(), {tmp_elements},
-                              {sycl::property::buffer::use_host_ptr()});
+        compute_t<T> val;
+        getQueue()
+            .submit([&](sycl::handler &h) {
+                auto acc_in =
+                    tmpOut.get()->template get_host_access(h, sycl::read_only);
+                auto acc_wt =
+                    tmpWt.get()->template get_host_access(h, sycl::read_only);
 
-        auto e1 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in =
-                tmpOut.getData()->get_access(h, sycl::range{tmp_elements});
-            auto acc_out = hBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        auto e2 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in =
-                tmpWt.getData()->get_access(h, sycl::range{tmp_elements});
-            auto acc_out = hwBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        e1.wait();
-        e2.wait();
+                h.host_task([acc_in, acc_wt, tmp_elements, &val] {
+                    val = static_cast<compute_t<T>>(acc_in[0]);
+                    compute_t<Tw> weight =
+                        static_cast<compute_t<Tw>>(acc_wt[0]);
 
-        compute_t<T> val     = static_cast<compute_t<T>>(h_ptr[0]);
-        compute_t<Tw> weight = static_cast<compute_t<Tw>>(h_wptr[0]);
-
-        for (int i = 1; i < tmp_elements; i++) {
-            stable_mean(&val, &weight, compute_t<T>(h_ptr[i]),
-                        compute_t<Tw>(h_wptr[i]));
-        }
-
+                    for (int i = 1; i < tmp_elements; i++) {
+                        stable_mean(&val, &weight, compute_t<T>(acc_in[i]),
+                                    compute_t<Tw>(acc_wt[i]));
+                    }
+                });
+            })
+            .wait();
         return static_cast<T>(val);
     } else {
-        std::vector<T> h_ptr(in_elements);
-        std::vector<Tw> h_wptr(in_elements);
+        compute_t<T> val;
+        getQueue()
+            .submit([&](sycl::handler &h) {
+                auto acc_in = in.data->template get_host_access(
+                    h, sycl::range{in_elements}, sycl::read_only);
+                auto acc_wt = iwt.data->template get_host_access(
+                    h, sycl::range{in_elements}, sycl::read_only);
 
-        sycl::buffer hBuffer(h_ptr.data(), {in_elements},
-                             {sycl::property::buffer::use_host_ptr()});
-        sycl::buffer hwBuffer(h_wptr.data(), {in_elements},
-                              {sycl::property::buffer::use_host_ptr()});
-
-        auto e1 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in  = in.data->get_access(h, sycl::range{in_elements});
-            auto acc_out = hBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        auto e2 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in  = iwt.data->get_access(h, sycl::range{in_elements});
-            auto acc_out = hwBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        e1.wait();
-        e2.wait();
-
-        compute_t<T> val     = static_cast<compute_t<T>>(h_ptr[0]);
-        compute_t<Tw> weight = static_cast<compute_t<Tw>>(h_wptr[0]);
-        for (int i = 1; i < in_elements; i++) {
-            stable_mean(&val, &weight, compute_t<T>(h_ptr[i]),
-                        compute_t<Tw>(h_wptr[i]));
-        }
-
+                h.host_task([acc_in, acc_wt, in_elements, &val]() {
+                    val                  = acc_in[0];
+                    compute_t<Tw> weight = acc_wt[0];
+                    for (int i = 1; i < in_elements; i++) {
+                        stable_mean(&val, &weight, compute_t<T>(acc_in[i]),
+                                    compute_t<Tw>(acc_wt[i]));
+                    }
+                });
+            })
+            .wait();
         return static_cast<T>(val);
     }
 }
@@ -723,60 +691,45 @@ To mean_all(Param<Ti> in) {
                                         blocks_y, threads_x);
 
         uintl tmp_elements = tmpOut.elements();
-        std::vector<To> h_ptr(tmp_elements);
-        std::vector<Tw> h_cptr(tmp_elements);
 
-        sycl::buffer hBuffer(h_ptr.data(), {tmp_elements},
-                             {sycl::property::buffer::use_host_ptr()});
-        sycl::buffer hcBuffer(h_cptr.data(), {tmp_elements},
-                              {sycl::property::buffer::use_host_ptr()});
-
-        auto e1 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in =
-                tmpOut.getData()->get_access(h, sycl::range{tmp_elements});
-            auto acc_out = hBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        auto e2 = getQueue().submit([&](sycl::handler &h) {
-            auto acc_in =
-                tmpCt.getData()->get_access(h, sycl::range{tmp_elements});
-            auto acc_out = hcBuffer.get_access();
-            h.copy(acc_in, acc_out);
-        });
-        e1.wait();
-        e2.wait();
-
-        compute_t<To> val    = static_cast<compute_t<To>>(h_ptr[0]);
-        compute_t<Tw> weight = static_cast<compute_t<Tw>>(h_cptr[0]);
-
-        for (int i = 1; i < tmp_elements; i++) {
-            stable_mean(&val, &weight, compute_t<To>(h_ptr[i]),
-                        compute_t<Tw>(h_cptr[i]));
-        }
-
-        return static_cast<To>(val);
-    } else {
-        std::vector<Ti> h_ptr(in_elements);
-        sycl::buffer outBuffer(h_ptr.data(), {in_elements},
-                               {sycl::property::buffer::use_host_ptr()});
-
+        compute_t<To> val;
         getQueue()
             .submit([&](sycl::handler &h) {
-                auto acc_in  = in.data->get_access(h);
-                auto acc_out = outBuffer.get_access();
-                h.copy(acc_in, acc_out);
+                auto out =
+                    tmpOut.get()->template get_host_access(h, sycl::read_only);
+                auto ct =
+                    tmpCt.get()->template get_host_access(h, sycl::read_only);
+
+                h.host_task([out, ct, tmp_elements, &val] {
+                    val                  = static_cast<compute_t<To>>(out[0]);
+                    compute_t<Tw> weight = static_cast<compute_t<Tw>>(ct[0]);
+
+                    for (int i = 1; i < tmp_elements; i++) {
+                        stable_mean(&val, &weight, compute_t<To>(out[i]),
+                                    compute_t<Tw>(ct[i]));
+                    }
+                });
             })
             .wait();
+        return static_cast<To>(val);
+    } else {
+        compute_t<To> val;
+        getQueue()
+            .submit([&](sycl::handler &h) {
+                auto acc_in =
+                    in.data->template get_host_access(h, sycl::read_only);
+                h.host_task([acc_in, in_elements, &val]() {
+                    common::Transform<Ti, compute_t<To>, af_add_t> transform;
+                    compute_t<Tw> count = static_cast<compute_t<Tw>>(1);
 
-        common::Transform<Ti, compute_t<To>, af_add_t> transform;
-        compute_t<Tw> count = static_cast<compute_t<Tw>>(1);
-
-        compute_t<To> val    = transform(h_ptr[0]);
-        compute_t<Tw> weight = count;
-        for (int i = 1; i < in_elements; i++) {
-            stable_mean(&val, &weight, transform(h_ptr[i]), count);
-        }
-
+                    val                  = transform(acc_in[0]);
+                    compute_t<Tw> weight = count;
+                    for (int i = 1; i < in_elements; i++) {
+                        stable_mean(&val, &weight, transform(acc_in[i]), count);
+                    }
+                });
+            })
+            .wait();
         return static_cast<To>(val);
     }
 }

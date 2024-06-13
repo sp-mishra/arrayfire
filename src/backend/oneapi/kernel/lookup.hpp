@@ -13,6 +13,9 @@
 #include <common/dispatch.hpp>
 #include <common/kernel_cache.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -20,11 +23,6 @@
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
-
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 int trimIndex(int idx, const int len) {
     int ret_val = idx;

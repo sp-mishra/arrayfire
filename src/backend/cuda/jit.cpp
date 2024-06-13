@@ -20,6 +20,7 @@
 #include <debug_cuda.hpp>
 #include <device_manager.hpp>
 #include <err_cuda.hpp>
+#include <jit/ShiftNode.hpp>
 #include <kernel_headers/jit_cuh.hpp>
 #include <math.hpp>
 #include <platform.hpp>
@@ -38,6 +39,8 @@ using arrayfire::common::findModule;
 using arrayfire::common::getEnvVar;
 using arrayfire::common::getFuncName;
 using arrayfire::common::half;
+using arrayfire::common::isBufferOrShift;
+using arrayfire::common::kNodeType;
 using arrayfire::common::ModdimNode;
 using arrayfire::common::Node;
 using arrayfire::common::Node_ids;
@@ -45,6 +48,8 @@ using arrayfire::common::Node_map_t;
 using arrayfire::common::Node_ptr;
 using arrayfire::common::NodeIterator;
 using arrayfire::common::saveKernel;
+using arrayfire::cuda::jit::BufferNode;
+using arrayfire::cuda::jit::ShiftNode;
 
 using std::array;
 using std::equal;
@@ -58,7 +63,6 @@ using std::vector;
 
 namespace arrayfire {
 namespace cuda {
-using jit::BufferNode;
 
 static string getKernelString(const string& funcName,
                               const vector<Node*>& full_nodes,
@@ -474,22 +478,9 @@ void evalNodes(vector<Param<T>>& outputs, const vector<Node*>& output_nodes) {
                 }
             }
             if (emptyColumnsFound) {
-                const auto isBuffer{
-                    [](const Node_ptr& node) { return node->isBuffer(); }};
-                for (auto nodeIt{begin(node_clones)}, endIt{end(node_clones)};
-                     (nodeIt = find_if(nodeIt, endIt, isBuffer)) != endIt;
-                     ++nodeIt) {
-                    BufferNode<T>* buf{
-                        static_cast<BufferNode<T>*>(nodeIt->get())};
-                    removeEmptyColumns(outDims, ndims, buf->m_param.dims,
-                                       buf->m_param.strides);
-                }
-                for_each(++begin(outputs), end(outputs),
-                         [outDims, ndims](Param<T>& output) {
-                             removeEmptyColumns(outDims, ndims, output.dims,
-                                                output.strides);
-                         });
-                ndims = removeEmptyColumns(outDims, ndims, outDims, outStrides);
+                common::removeEmptyDimensions<Param<T>, BufferNode<T>,
+                                              ShiftNode<T>>(outputs,
+                                                            node_clones);
             }
 
             full_nodes.clear();
@@ -508,7 +499,8 @@ void evalNodes(vector<Param<T>>& outputs, const vector<Node*>& output_nodes) {
         vector<void*> args;
         for (const Node* node : full_nodes) {
             node->setArgs(0, is_linear,
-                          [&](int /*id*/, const void* ptr, size_t /*size*/) {
+                          [&](int /*id*/, const void* ptr, size_t /*size*/,
+                              bool /*is_buffer*/) {
                               args.push_back(const_cast<void*>(ptr));
                           });
         }

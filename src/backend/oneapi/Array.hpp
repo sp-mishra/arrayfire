@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <Param.hpp>
 #include <backend.hpp>
 #include <common/ArrayInfo.hpp>
 #include <kernel/KParam.hpp>
@@ -16,12 +17,13 @@
 #include <types.hpp>
 #include <af/dim4.hpp>
 
-#include <sycl/buffer.hpp>
+#include <sycl/sycl.hpp>
 
 #include <nonstd/span.hpp>
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 enum class kJITHeuristics;
@@ -40,7 +42,7 @@ namespace oneapi {
 
 template<typename T>
 struct Param;
-template<typename T>
+template<typename T, sycl::access_mode AM>
 struct AParam;
 
 template<typename T>
@@ -48,6 +50,13 @@ using Buffer_ptr = std::shared_ptr<sycl::buffer<T>>;
 using af::dim4;
 template<typename T>
 class Array;
+
+/// Checks if the Array object can be migrated to the current device and if not,
+/// an error is thrown
+///
+/// \param[in] arr The Array that will be checked.
+template<typename T>
+void checkAndMigrate(const Array<T> &arr);
 
 template<typename T>
 void evalMultiple(std::vector<Array<T> *> arrays);
@@ -177,6 +186,8 @@ class Array {
     explicit Array(const af::dim4 &dims, sycl::buffer<T> *const mem,
                    size_t offset, bool copy);
 
+    std::shared_ptr<sycl::buffer<T>> getData() const { return data; }
+
    public:
     Array(const Array<T> &other) = default;
 
@@ -250,23 +261,30 @@ class Array {
         return const_cast<Array<T> *>(this)->device();
     }
 
-    // FIXME: This should do a copy if it is not owner. You do not want to
-    // overwrite parents data
-    sycl::buffer<T> *get() {
-        if (!isReady()) eval();
+    sycl::buffer<T> *get() const {
+        if (!isReady()) { eval(); }
         return data.get();
     }
 
-    const sycl::buffer<T> *get() const {
-        if (!isReady()) eval();
-        return data.get();
+    template<typename outT>
+    sycl::buffer<outT> getBufferWithOffset(dim_t offset = -1) const {
+        offset             = (offset == -1) ? getOffset() : offset;
+        dim_t sz_remaining = data_dims.elements() - offset;
+        if constexpr (std::is_same_v<outT, T>) {
+            if (offset == 0) { return *get(); }
+            return sycl::buffer<outT, 1>(*get(), sycl::id<1>(offset),
+                                         sycl::range<1>(sz_remaining));
+        } else {
+            if (offset == 0) { return get()->template reinterpret<outT, 1>(); }
+            return sycl::buffer<T, 1>(*get(), sycl::id<1>(offset),
+                                      sycl::range<1>(sz_remaining))
+                .template reinterpret<outT, 1>();
+        }
     }
 
     int useCount() const { return data.use_count(); }
 
     dim_t getOffset() const { return info.getOffset(); }
-
-    std::shared_ptr<sycl::buffer<T>> getData() const { return data; }
 
     dim4 getDataDims() const { return data_dims; }
 
@@ -283,8 +301,15 @@ class Array {
         return out;
     }
 
-    operator AParam<T>() {
-        AParam<T> out(*getData(), dims().get(), strides().get(), getOffset());
+    operator AParam<T, sycl::access_mode::write>() {
+        AParam<T, sycl::access_mode::write> out(*getData(), dims().get(),
+                                                strides().get(), getOffset());
+        return out;
+    }
+
+    operator AParam<T, sycl::access_mode::read>() const {
+        AParam<T, sycl::access_mode::read> out(*getData(), dims().get(),
+                                               strides().get(), getOffset());
         return out;
     }
 

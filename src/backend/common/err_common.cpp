@@ -24,6 +24,9 @@
 #ifdef AF_OPENCL
 #include <errorcodes.hpp>
 #include <platform.hpp>
+#elif defined(AF_ONEAPI)
+#include <oneapi/mkl/exceptions.hpp>
+#include <sycl/sycl.hpp>
 #endif
 
 using boost::stacktrace::stacktrace;
@@ -161,6 +164,24 @@ af_err processException() {
         if (is_stacktrace_enabled()) { ss << ex.getStacktrace(); }
 
         err = set_global_error_string(ss.str(), ex.getError());
+#ifdef AF_ONEAPI
+    } catch (const sycl::exception &ex) {
+        char oneapi_err_msg[1024];
+        snprintf(oneapi_err_msg, sizeof(oneapi_err_msg),
+                 "oneAPI Error (%d): %s", ex.code().value(), ex.what());
+
+        if (ex.code() == sycl::errc::memory_allocation) {
+            err = set_global_error_string(oneapi_err_msg, AF_ERR_NO_MEM);
+        } else {
+            err = set_global_error_string(oneapi_err_msg, AF_ERR_INTERNAL);
+        }
+    } catch (const oneapi::mkl::exception &ex) {
+        char oneapi_err_msg[1024];
+        snprintf(oneapi_err_msg, sizeof(oneapi_err_msg), "MKL Error: %s",
+                 ex.what());
+
+        err = set_global_error_string(oneapi_err_msg, AF_ERR_INTERNAL);
+#endif
 #ifdef AF_OPENCL
     } catch (const cl::Error &ex) {
         char opencl_err_msg[1024];
@@ -174,6 +195,8 @@ af_err processException() {
             err = set_global_error_string(opencl_err_msg, AF_ERR_INTERNAL);
         }
 #endif
+    } catch (const std::exception &ex) {
+        err = set_global_error_string(ex.what(), AF_ERR_UNKNOWN);
     } catch (...) { err = set_global_error_string(ss.str(), AF_ERR_UNKNOWN); }
 
     return err;

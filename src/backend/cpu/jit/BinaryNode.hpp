@@ -32,7 +32,7 @@ class BinaryNode : public TNode<compute_t<To>> {
     BinaryNode(common::Node_ptr lhs, common::Node_ptr rhs)
         : TNode<compute_t<To>>(compute_t<To>(0),
                                std::max(lhs->getHeight(), rhs->getHeight()) + 1,
-                               {{lhs, rhs}}) {}
+                               {{lhs, rhs}}, common::kNodeType::Nary) {}
 
     std::unique_ptr<common::Node> clone() final {
         return std::make_unique<BinaryNode>(*this);
@@ -71,7 +71,8 @@ class BinaryNode : public TNode<compute_t<To>> {
     }
 
     int setArgs(int start_id, bool is_linear,
-                std::function<void(int id, const void *ptr, size_t arg_size)>
+                std::function<void(int id, const void *ptr, size_t arg_size,
+                                   bool is_buffer)>
                     setArg) const override {
         UNUSED(is_linear);
         UNUSED(setArg);

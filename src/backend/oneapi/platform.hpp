@@ -11,9 +11,7 @@
 
 #include <af/oneapi.h>
 
-#include <sycl/context.hpp>
-#include <sycl/device.hpp>
-#include <sycl/queue.hpp>
+#include <sycl/sycl.hpp>
 
 #include <memory>
 #include <string>
@@ -132,6 +130,8 @@ void resetMemoryManagerPinned();
 arrayfire::common::ForgeManager& forgeManager();
 
 GraphicsResourceManager& interopManager();
+
+PlanCache& fftManager();
 
 // afcl::platform getPlatformEnum(cl::Device dev);
 

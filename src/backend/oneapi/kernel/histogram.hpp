@@ -13,9 +13,10 @@
 #include <common/dispatch.hpp>
 #include <debug_oneapi.hpp>
 #include <err_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <traits.hpp>
 
-#include <sycl/atomic_ref.hpp>
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -42,18 +43,14 @@ using global_atomic_ref =
     sycl::atomic_ref<T, sycl::memory_order::relaxed, sycl::memory_scope::system,
                      sycl::access::address_space::global_space>;
 
-template<typename T, int dimensions>
-using local_accessor =
-    sycl::accessor<T, dimensions, sycl::access::mode::read_write,
-                   sycl::access::target::local>;
-
 template<typename T>
 class histogramKernel {
    public:
-    histogramKernel(sycl::accessor<uint> d_dst, KParam oInfo,
-                    const sycl::accessor<T> d_src, KParam iInfo,
-                    local_accessor<uint, 1> localMemAcc, int len, int nbins,
-                    float minval, float maxval, int nBBS, const bool isLinear)
+    histogramKernel(write_accessor<uint> d_dst, KParam oInfo,
+                    const read_accessor<T> d_src, KParam iInfo,
+                    sycl::local_accessor<uint, 1> localMemAcc, int len,
+                    int nbins, float minval, float maxval, int nBBS,
+                    const bool isLinear)
         : d_dst_(d_dst)
         , oInfo_(oInfo)
         , d_src_(d_src)
@@ -71,7 +68,8 @@ class histogramKernel {
         int start     = (g.get_group_id(0) - b2 * nBBS_) * THRD_LOAD *
                         g.get_local_range(0) +
                     it.get_local_id(0);
-        int end = fmin((int)(start + THRD_LOAD * g.get_local_range(0)), len_);
+        int end =
+            sycl::min((int)(start + THRD_LOAD * g.get_local_range(0)), len_);
 
         // offset input and output to account for batch ops
         const T *in = d_src_.get_pointer() + b2 * iInfo_.strides[2] +
@@ -96,8 +94,8 @@ class histogramKernel {
             const int idx = isLinear_ ? row : i0 + i1 * iInfo_.strides[1];
 
             int bin = (int)(((float)in[idx] - minval_) / dx);
-            bin     = fmax(bin, 0);
-            bin     = fmin(bin, (int)nbins_ - 1);
+            bin     = sycl::max(bin, 0);
+            bin     = sycl::min(bin, (int)nbins_ - 1);
 
             if (use_global) {
                 global_atomic_ref<uint>(d_dst_[outOffset + bin])++;
@@ -117,11 +115,11 @@ class histogramKernel {
     }
 
    private:
-    sycl::accessor<uint> d_dst_;
+    write_accessor<uint> d_dst_;
     KParam oInfo_;
-    sycl::accessor<T> d_src_;
+    read_accessor<T> d_src_;
     KParam iInfo_;
-    local_accessor<uint, 1> localMemAcc_;
+    sycl::local_accessor<uint, 1> localMemAcc_;
     int len_;
     int nbins_;
     float minval_;
@@ -143,10 +141,10 @@ void histogram(Param<uint> out, const Param<T> in, int nbins, float minval,
     auto global          = sycl::range{global0, global1};
 
     getQueue().submit([&](sycl::handler &h) {
-        auto inAcc  = in.data->get_access(h);
-        auto outAcc = out.data->get_access(h);
+        read_accessor<T> inAcc{*in.data, h};
+        write_accessor<uint> outAcc{*out.data, h};
 
-        auto localMem = local_accessor<uint, 1>(locSize, h);
+        auto localMem = sycl::local_accessor<uint, 1>(locSize, h);
 
         h.parallel_for(
             sycl::nd_range{global, local},

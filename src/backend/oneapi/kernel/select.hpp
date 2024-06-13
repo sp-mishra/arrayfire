@@ -12,7 +12,10 @@
 #include <Param.hpp>
 #include <common/dispatch.hpp>
 #include <common/kernel_cache.hpp>
+#include <kernel/accessors.hpp>
 #include <math.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -20,11 +23,6 @@
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
-
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 constexpr uint DIMX  = 32;
 constexpr uint DIMY  = 8;
@@ -61,9 +59,9 @@ class selectKernelCreateKernel {
     void operator()(sycl::nd_item<2> it) const {
         sycl::group g = it.get_group();
 
-        char *cptr = cptr__.get_pointer() + cinfo_.offset;
-        T *aptr    = aptr__.get_pointer() + ainfo_.offset;
-        T *bptr    = bptr__.get_pointer() + binfo_.offset;
+        const char *cptr = cptr__.get_pointer() + cinfo_.offset;
+        const T *aptr    = aptr__.get_pointer() + ainfo_.offset;
+        const T *bptr    = bptr__.get_pointer() + binfo_.offset;
 
         const int idz = g.get_group_id(0) / groups_0_;
         const int idw = g.get_group_id(1) / groups_1_;
@@ -171,8 +169,8 @@ class selectScalarCreateKernel {
     void operator()(sycl::nd_item<2> it) const {
         sycl::group g = it.get_group();
 
-        char *cptr = cptr__.get_pointer() + cinfo_.offset;
-        T *aptr    = aptr__.get_pointer() + ainfo_.offset;
+        const char *cptr = cptr__.get_pointer() + cinfo_.offset;
+        const T *aptr    = aptr__.get_pointer() + ainfo_.offset;
 
         const int idz = g.get_group_id(0) / groups_0_;
         const int idw = g.get_group_id(1) / groups_1_;
@@ -187,7 +185,8 @@ class selectScalarCreateKernel {
                         idy * oinfo_.strides[1];
 
         int ids[] = {idx0, idy, idz, idw};
-        optr_.get_pointer() += off;
+        T *optr   = optr_.get_pointer();
+        optr += off;
         aptr += getOffset(ainfo_.dims, ainfo_.strides, oinfo_.dims, ids);
         cptr += getOffset(cinfo_.dims, cinfo_.strides, oinfo_.dims, ids);
 
@@ -198,7 +197,7 @@ class selectScalarCreateKernel {
 
         for (int idx = idx0; idx < oinfo_.dims[0];
              idx += g.get_local_range(0) * groups_0_) {
-            optr_.get_pointer()[idx] = (cptr[idx] ^ flip_) ? aptr[idx] : b_;
+            optr[idx] = (cptr[idx] ^ flip_) ? aptr[idx] : b_;
         }
     }
 

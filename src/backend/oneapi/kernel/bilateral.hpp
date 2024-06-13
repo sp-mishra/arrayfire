@@ -13,9 +13,10 @@
 #include <common/dispatch.hpp>
 #include <debug_oneapi.hpp>
 #include <err_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <traits.hpp>
 
-#include <sycl/builtins.hpp>
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -23,11 +24,6 @@
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
-
-template<typename T, int dimensions>
-using local_accessor =
-    sycl::accessor<T, dimensions, sycl::access::mode::read_write,
-                   sycl::access::target::local>;
 
 template<typename outType, bool USE_NATIVE_EXP>
 auto exp_native_nonnative(float in) {
@@ -40,10 +36,10 @@ auto exp_native_nonnative(float in) {
 template<typename outType, typename inType, bool USE_NATIVE_EXP>
 class bilateralKernel {
    public:
-    bilateralKernel(sycl::accessor<outType> d_dst, KParam oInfo,
-                    sycl::accessor<inType> d_src, KParam iInfo,
-                    local_accessor<outType, 1> localMem,
-                    local_accessor<outType, 1> gauss2d, float sigma_space,
+    bilateralKernel(write_accessor<outType> d_dst, KParam oInfo,
+                    read_accessor<inType> d_src, KParam iInfo,
+                    sycl::local_accessor<outType, 1> localMem,
+                    sycl::local_accessor<outType, 1> gauss2d, float sigma_space,
                     float sigma_color, int gaussOff, int nBBS0, int nBBS1)
         : d_dst_(d_dst)
         , oInfo_(oInfo)
@@ -57,14 +53,14 @@ class bilateralKernel {
         , nBBS0_(nBBS0)
         , nBBS1_(nBBS1) {}
     void operator()(sycl::nd_item<2> it) const {
-        sycl::group g                   = it.get_group();
-        const int radius                = fmax((int)(sigma_space_ * 1.5f), 1);
-        const int padding               = 2 * radius;
-        const int window_size           = padding + 1;
-        const int shrdLen               = g.get_local_range(0) + padding;
-        const float variance_range      = sigma_color_ * sigma_color_;
-        const float variance_space      = sigma_space_ * sigma_space_;
-        const float variance_space_neg2 = -2.0 * variance_space;
+        sycl::group g              = it.get_group();
+        const int radius           = sycl::max((int)(sigma_space_ * 1.5f), 1);
+        const int padding          = 2 * radius;
+        const int window_size      = padding + 1;
+        const int shrdLen          = g.get_local_range(0) + padding;
+        const float variance_range = sigma_color_ * sigma_color_;
+        const float variance_space = sigma_space_ * sigma_space_;
+        const float variance_space_neg2     = -2.0 * variance_space;
         const float inv_variance_range_neg2 = -0.5 / (variance_range);
 
         // gfor batch offsets
@@ -121,9 +117,7 @@ class bilateralKernel {
             int joff = (ly - radius) * shrdLen + (lx - radius);
             int goff = 0;
 
-#pragma unroll
             for (int wj = 0; wj < window_size; ++wj) {
-#pragma unroll
                 for (int wi = 0; wi < window_size; ++wi) {
                     outType tmp_color = localMem_[joff + wi];
                     const outType c   = center_color - tmp_color;
@@ -145,22 +139,27 @@ class bilateralKernel {
         return (y * stride1 + x * stride0);
     }
 
-    void load2LocalMem(local_accessor<outType, 1> shrd, const inType* in,
+    template<class T>
+    constexpr const T& clamp0(const T& v, const T& lo, const T& hi) const {
+        return (v < lo) ? lo : (hi < v) ? hi : v;
+    }
+
+    void load2LocalMem(sycl::local_accessor<outType, 1> shrd, const inType* in,
                        int lx, int ly, int shrdStride, int dim0, int dim1,
                        int gx, int gy, int inStride1, int inStride0) const {
-        int gx_ = std::clamp(gx, 0, dim0 - 1);
-        int gy_ = std::clamp(gy, 0, dim1 - 1);
+        int gx_ = sycl::clamp(gx, 0, dim0 - 1);
+        int gy_ = sycl::clamp(gy, 0, dim1 - 1);
         shrd[lIdx(lx, ly, shrdStride, 1)] =
             (outType)in[lIdx(gx_, gy_, inStride1, inStride0)];
     }
 
    private:
-    sycl::accessor<outType> d_dst_;
+    write_accessor<outType> d_dst_;
     KParam oInfo_;
-    sycl::accessor<inType> d_src_;
+    read_accessor<inType> d_src_;
     KParam iInfo_;
-    local_accessor<outType, 1> localMem_;
-    local_accessor<outType, 1> gauss2d_;
+    sycl::local_accessor<outType, 1> localMem_;
+    sycl::local_accessor<outType, 1> gauss2d_;
     float sigma_space_;
     float sigma_color_;
     int gaussOff_;
@@ -200,18 +199,17 @@ void bilateral(Param<outType> out, const Param<inType> in, const float s_sigma,
     }
 
     getQueue().submit([&](sycl::handler& h) {
-        auto inAcc  = in.data->get_access(h);
-        auto outAcc = out.data->get_access(h);
+        read_accessor<inType> inAcc{*in.data, h};
+        write_accessor<outType> outAcc{*out.data, h};
 
-        auto localMem = local_accessor<outType, 1>(num_shrd_elems, h);
-        auto gauss2d  = local_accessor<outType, 1>(num_shrd_elems, h);
+        auto localMem = sycl::local_accessor<outType, 1>(num_shrd_elems, h);
+        auto gauss2d  = sycl::local_accessor<outType, 1>(num_shrd_elems, h);
 
         h.parallel_for(sycl::nd_range{global, local},
                        bilateralKernel<outType, inType, UseNativeExp>(
                            outAcc, out.info, inAcc, in.info, localMem, gauss2d,
                            s_sigma, c_sigma, num_shrd_elems, blk_x, blk_y));
     });
-
     ONEAPI_DEBUG_FINISH(getQueue());
 }
 

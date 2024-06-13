@@ -5,14 +5,17 @@
 # The complete license agreement can be obtained at:
 # http://arrayfire.com/licenses/BSD-3-Clause
 
-cmake_minimum_required(VERSION 3.10.2)
+if(AF_BUILD_ONEAPI)
+  cmake_minimum_required(VERSION 3.20)
+else()
+  cmake_minimum_required(VERSION 3.16.3)
+endif()
 include(CheckLanguage)
 
 include(CMakeModules/AF_vcpkg_options.cmake)
 
-project(ArrayFire VERSION 3.9.0 LANGUAGES C CXX)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
+project(ArrayFire VERSION 3.9.0 LANGUAGES C CXX)
 
 include(AFconfigure_deps_vars)
 include(AFBuildConfigurations)
@@ -44,9 +47,19 @@ option(AF_WITH_EXTERNAL_PACKAGES_ONLY "Build ArrayFire with External packages on
 if(AF_WITH_EXTERNAL_PACKAGES_ONLY)
   set(AF_REQUIRED REQUIRED)
 endif()
-
-#Set Intel OpenMP as default MKL thread layer
-set(MKL_THREAD_LAYER "Intel OpenMP" CACHE STRING "The thread layer to choose for MKL")
+if(CMAKE_SYCL_COMPILER)
+  get_filename_component(SYCL_COMPILER_NAME ${CMAKE_SYCL_COMPILER} NAME)
+endif()
+if(SYCL_COMPILER_NAME STREQUAL "dpcpp" OR SYCL_COMPILER_NAME STREQUAL "dpcpp.exe"
+   OR SYCL_COMPILER_NAME STREQUAL "icpx" OR SYCL_COMPILER_NAME STREQUAL "icx.exe")
+  set(MKL_THREAD_LAYER "TBB" CACHE STRING "The thread layer to choose for MKL")
+  set(MKL_INTERFACE "ilp64")
+  set(MKL_INTERFACE_INTEGER_SIZE 8)
+else()
+  set(MKL_THREAD_LAYER "Intel OpenMP" CACHE STRING "The thread layer to choose for MKL")
+  set(MKL_INTERFACE "lp64")
+  set(MKL_INTERFACE_INTEGER_SIZE 4)
+endif()
 
 find_package(CUDA 10.2)
 find_package(cuDNN 4.0)
@@ -59,7 +72,7 @@ find_package(FFTW)
 find_package(CBLAS)
 find_package(LAPACKE)
 find_package(Doxygen)
-find_package(MKL)
+find_package(AF_MKL)
 find_package(spdlog QUIET ${AF_REQUIRED} NO_CMAKE_PACKAGE_REGISTRY)
 find_package(fmt QUIET ${AF_REQUIRED})
 find_package(span-lite QUIET)
@@ -93,6 +106,7 @@ option(AF_WITH_STATIC_CUDA_NUMERIC_LIBS "Link libafcuda with static numeric libr
 option(AF_WITH_SPDLOG_HEADER_ONLY "Build ArrayFire with header only version of spdlog" OFF)
 option(AF_WITH_FMT_HEADER_ONLY "Build ArrayFire with header only version of fmt" OFF)
 option(AF_WITH_FAST_MATH "Use lower precision but high performance numeric optimizations" OFF)
+option(AF_CTEST_SEPARATED "Run tests separately when called from ctest(increases test times)" OFF)
 
 if(AF_WITH_STATIC_CUDA_NUMERIC_LIBS)
   option(AF_WITH_PRUNE_STATIC_CUDA_NUMERIC_LIBS "Prune CUDA static libraries to reduce binary size.(WARNING: May break some libs on older CUDA toolkits for some compute arch)" OFF)
@@ -101,6 +115,33 @@ endif()
 set(default_compute_library "FFTW/LAPACK/BLAS")
 if(MKL_FOUND)
   set(default_compute_library "Intel-MKL")
+endif()
+
+if(AF_WITH_STATIC_MKL)
+  set(MKL_LINK static)
+endif()
+if(MKL_THREAD_LAYER STREQUAL "Sequential")
+  set(MKL_THREADING "sequential")
+elseif(MKL_THREAD_LAYER STREQUAL "GNU OpenMP")
+  set(MKL_THREADING "gnu_thread")
+elseif(MKL_THREAD_LAYER STREQUAL "Intel OpenMP")
+  set(MKL_THREADING "intel_thread")
+elseif(MKL_THREAD_LAYER STREQUAL "TBB")
+  set(MKL_THREADING "tbb_thread")
+else()
+endif()
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
+  # VCPKG overrides the find_package command and the PATH parameter is currently
+  # broken with the current version of VCPKG so we are setting the MKL_ROOT
+  # directory to the MKLROOT environment variable.
+  if(DEFINED ENV{MKLROOT} AND NOT DEFINED MKL_ROOT)
+    set(MKL_ROOT "$ENV{MKLROOT}")
+  endif()
+  set(DPCPP_COMPILER ON)
+  set(MKL_THREADING "tbb_thread")
+  set(MKL_INTERFACE "ilp64")
+  find_package(MKL 2023.1)
 endif()
 
 af_multiple_option(NAME        AF_COMPUTE_LIBRARY
@@ -194,7 +235,7 @@ if(${AF_BUILD_CPU} OR ${AF_BUILD_OPENCL})
   if("${AF_COMPUTE_LIBRARY}" STREQUAL "Intel-MKL"
       OR "${AF_COMPUTE_LIBRARY}" STREQUAL "MKL")
     af_mkl_batch_check()
-    dependency_check(MKL_FOUND "Please ensure Intel-MKL / oneAPI-oneMKL is installed")
+    dependency_check(MKL_Shared_FOUND "Please ensure Intel-MKL / oneAPI-oneMKL is installed")
     set(BUILD_WITH_MKL ON)
   elseif("${AF_COMPUTE_LIBRARY}" STREQUAL "FFTW/LAPACK/BLAS")
     dependency_check(FFTW_FOUND "FFTW not found")
@@ -238,6 +279,7 @@ else()
   if(AF_WITH_SPDLOG_HEADER_ONLY)
     set_target_properties(af_spdlog
       PROPERTIES
+        INTERFACE_COMPILE_DEFINITIONS "FMT_HEADER_ONLY=1"
         INTERFACE_LINK_LIBRARIES "spdlog_header_only")
   else()
     target_compile_options(spdlog

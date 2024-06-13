@@ -29,7 +29,7 @@ using detail::ushort;
 namespace arrayfire {
 
 af_array retain(const af_array in) {
-    const ArrayInfo &info = getInfo(in, false, false);
+    const ArrayInfo &info = getInfo(in, false);
     af_dtype ty           = info.getType();
 
     if (info.isSparse()) {
@@ -139,9 +139,9 @@ dim4 verifyDims(const unsigned ndims, const dim_t *const dims) {
 
 template<typename T>
 void releaseHandle(const af_array arr) {
-    auto &Arr      = getArray<T>(arr);
+    auto &info     = getInfo(arr);
     int old_device = detail::getActiveDeviceId();
-    int array_id   = Arr.getDevId();
+    int array_id   = info.getDevId();
     if (array_id != old_device) {
         detail::setDevice(array_id);
         detail::destroyArray(static_cast<detail::Array<T> *>(arr));

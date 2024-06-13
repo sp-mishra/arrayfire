@@ -11,111 +11,129 @@
 
 #include <err_oneapi.hpp>
 
-#if defined(WITH_LINEAR_ALGEBRA) && !defined(AF_ONEAPI)
+#if defined(WITH_LINEAR_ALGEBRA)
+#include <Array.hpp>
 #include <blas.hpp>
+#include <common/cast.hpp>
 #include <copy.hpp>
-#include <cpu/cpu_solve.hpp>
 #include <lu.hpp>
-#include <magma/magma.h>
-#include <magma/magma_blas.h>
-#include <magma/magma_data.h>
-#include <magma/magma_helper.h>
 #include <math.hpp>
+#include <memory.hpp>
+#include <oneapi/mkl/blas.hpp>
+#include <oneapi/mkl/lapack.hpp>
 #include <platform.hpp>
 #include <transpose.hpp>
-#include <af/opencl.h>
 
+#include <common/traits.hpp>
 #include <algorithm>
+#include <type_traits>
 #include <vector>
 
-using cl::Buffer;
+using arrayfire::common::cast;
 using std::min;
 using std::vector;
+using sycl::buffer;
 
 namespace arrayfire {
 namespace oneapi {
 
+static ::oneapi::mkl::transpose toMKLTranspose(af_mat_prop opt) {
+    switch (opt) {
+        case AF_MAT_NONE: return ::oneapi::mkl::transpose::nontrans;
+        case AF_MAT_TRANS: return ::oneapi::mkl::transpose::trans;
+        case AF_MAT_CTRANS: return ::oneapi::mkl::transpose::conjtrans;
+        default: AF_ERROR("INVALID af_mat_prop", AF_ERR_ARG);
+    }
+}
+
 template<typename T>
 Array<T> solveLU(const Array<T> &A, const Array<int> &pivot, const Array<T> &b,
                  const af_mat_prop options) {
-    ONEAPI_NOT_SUPPORTED("solveLU Not supported");
+    const int64_t N    = A.dims()[0];
+    const int64_t NRHS = b.dims()[1];
+    const int64_t LDA  = A.strides()[1];
+    const int64_t LDB  = b.strides()[1];
 
-    if (OpenCLCPUOffload()) { return cpu::solveLU(A, pivot, b, options); }
+    ::oneapi::mkl::transpose opts = toMKLTranspose(options);
+    std::int64_t scratchpad_size =
+        ::oneapi::mkl::lapack::getrs_scratchpad_size<compute_t<T>>(
+            getQueue(), opts, N, NRHS, LDA, LDB);
 
-    int N    = A.dims()[0];
-    int NRHS = b.dims()[1];
+    Array<intl> ipiv        = cast<intl, int>(pivot);
+    buffer<int64_t> ipivBuf = ipiv.get()->reinterpret<int64_t, 1>();
+    auto scratchpad         = memAlloc<compute_t<T>>(scratchpad_size);
 
-    vector<int> ipiv(N);
-    copyData(&ipiv[0], pivot);
+    Array<compute_t<T>> B     = copyArray<compute_t<T>>(b);
+    buffer<compute_t<T>> aBuf = A.template getBufferWithOffset<compute_t<T>>();
+    buffer<compute_t<T>> bBuf = B.template getBufferWithOffset<compute_t<T>>();
 
-    Array<T> B = copyArray<T>(b);
-
-    const Buffer *A_buf = A.get();
-    Buffer *B_buf       = B.get();
-
-    int info = 0;
-    magma_getrs_gpu<T>(MagmaNoTrans, N, NRHS, (*A_buf)(), A.getOffset(),
-                       A.strides()[1], &ipiv[0], (*B_buf)(), B.getOffset(),
-                       B.strides()[1], getQueue()(), &info);
+    ::oneapi::mkl::lapack::getrs(getQueue(), opts, N, NRHS, aBuf, LDA, ipivBuf,
+                                 bBuf, LDB, *scratchpad, scratchpad->size());
     return B;
 }
 
 template<typename T>
 Array<T> generalSolve(const Array<T> &a, const Array<T> &b) {
-    ONEAPI_NOT_SUPPORTED("generalSolve Not supported");
+    int batches = a.dims()[2] * a.dims()[3];
 
-    // dim4 aDims = a.dims();
-    // int batchz = aDims[2];
-    // int batchw = aDims[3];
+    dim4 aDims = a.dims();
+    dim4 bDims = b.dims();
+    int M      = aDims[0];
+    int N      = aDims[1];
+    int K      = bDims[1];
+    int MN     = std::min(M, N);
 
-    // Array<T> A = copyArray<T>(a);
-    Array<T> B = copyArray<T>(b);
+    int lda        = a.strides()[1];
+    int astride    = a.strides()[2];
+    auto ipiv      = memAlloc<int64_t>(MN * batches);
+    int ipivstride = MN;
 
-    // for (int i = 0; i < batchw; i++) {
-    //     for (int j = 0; j < batchz; j++) {
-    //         int M  = aDims[0];
-    //         int N  = aDims[1];
-    //         int MN = min(M, N);
-    //         vector<int> ipiv(MN);
+    int ldb     = b.strides()[1];
+    int bstride = b.strides()[2];
 
-    //         Buffer *A_buf      = A.get();
-    //         int info           = 0;
-    //         cl_command_queue q = getQueue()();
-    //         auto aoffset =
-    //             A.getOffset() + j * A.strides()[2] + i * A.strides()[3];
-    //         magma_getrf_gpu<T>(M, N, (*A_buf)(), aoffset, A.strides()[1],
-    //                            &ipiv[0], q, &info);
+    vector<int> info(batches, 0);
 
-    //         Buffer *B_buf = B.get();
-    //         int K         = B.dims()[1];
+    Array<T> A = copyArray<T>(a);  // A will be overwritten by L,U
+    Array<T> B = copyArray<T>(b);  // will be overwritten with solution
 
-    //         auto boffset =
-    //             B.getOffset() + j * B.strides()[2] + i * B.strides()[3];
-    //         magma_getrs_gpu<T>(MagmaNoTrans, M, K, (*A_buf)(), aoffset,
-    //                            A.strides()[1], &ipiv[0], (*B_buf)(), boffset,
-    //                            B.strides()[1], q, &info);
-    //     }
-    // }
+    std::int64_t scratchpad_size =
+        ::oneapi::mkl::lapack::getrf_batch_scratchpad_size<compute_t<T>>(
+            getQueue(), M, N, lda, astride, ipivstride, batches);
+
+    auto scratchpad = memAlloc<compute_t<T>>(scratchpad_size);
+
+    buffer<compute_t<T>> aBuf = A.template getBufferWithOffset<compute_t<T>>();
+    buffer<compute_t<T>> bBuf = B.template getBufferWithOffset<compute_t<T>>();
+    ::oneapi::mkl::lapack::getrf_batch(getQueue(), M, N, aBuf, lda, astride,
+                                       *ipiv, ipivstride, batches, *scratchpad,
+                                       scratchpad->size());
+
+    scratchpad_size =
+        ::oneapi::mkl::lapack::getrs_batch_scratchpad_size<compute_t<T>>(
+            getQueue(), ::oneapi::mkl::transpose::nontrans, N, K, lda, astride,
+            ipivstride, ldb, bstride, batches);
+
+    auto scratchpad_rs = memAlloc<compute_t<T>>(scratchpad_size);
+
+    ::oneapi::mkl::lapack::getrs_batch(
+        getQueue(), ::oneapi::mkl::transpose::nontrans, N, K, aBuf, lda,
+        astride, *ipiv, ipivstride, bBuf, ldb, bstride, batches, *scratchpad_rs,
+        scratchpad_rs->size());
+
     return B;
 }
 
 template<typename T>
 Array<T> leastSquares(const Array<T> &a, const Array<T> &b) {
-    ONEAPI_NOT_SUPPORTED("leastSquares Not supported");
-
-    int M  = a.dims()[0];
-    int N  = a.dims()[1];
-    int K  = b.dims()[1];
-    int MN = min(M, N);
+    int64_t M  = a.dims()[0];
+    int64_t N  = a.dims()[1];
+    int64_t K  = b.dims()[1];
+    int64_t MN = min(M, N);
 
     Array<T> B = createEmptyArray<T>(dim4());
-    gpu_blas_trsm_func<T> gpu_blas_trsm;
-
-    cl_event event;
-    cl_command_queue queue = getQueue()();
 
     if (M < N) {
-#define UNMQR 0  // FIXME: UNMQR == 1 should be faster but does not work
+        const dim4 NullShape(0, 0, 0, 0);
 
         // Least squres for this case is solved using the following
         // solve(A, B) == matmul(Q, Xpad);
@@ -127,71 +145,76 @@ Array<T> leastSquares(const Array<T> &a, const Array<T> &b) {
 
         // QR is performed on the transpose of A
         Array<T> A = transpose<T>(a, true);
-
-#if UNMQR
-        const dim4 NullShape(0, 0, 0, 0);
         dim4 endPadding(N - b.dims()[0], K - b.dims()[1], 0, 0);
         B = (endPadding == NullShape
                  ? copyArray(b)
                  : padArrayBorders(b, NullShape, endPadding, AF_PAD_ZERO));
-        B.resetDims(dim4(M, K));
-#else
-        B = copyArray<T>(b);
-#endif
 
-        int NB       = magma_get_geqrf_nb<T>(A.dims()[1]);
-        int NUM      = (2 * MN + ((M + 31) / 32) * 32) * NB;
-        Array<T> tmp = createEmptyArray<T>(dim4(NUM));
+        // Get workspace needed for QR
+        std::int64_t scratchpad_size =
+            ::oneapi::mkl::lapack::geqrf_scratchpad_size<compute_t<T>>(
+                getQueue(), A.dims()[0], A.dims()[1], A.strides()[1]);
 
-        vector<T> h_tau(MN);
+        auto scratchpad = memAlloc<compute_t<T>>(scratchpad_size);
+        auto t          = memAlloc<compute_t<T>>(MN);
 
-        int info   = 0;
-        Buffer *dA = A.get();
-        Buffer *dT = tmp.get();
-        Buffer *dB = B.get();
+        buffer<compute_t<T>> aBuf =
+            A.template getBufferWithOffset<compute_t<T>>();
+        // In place Perform in place QR
+        ::oneapi::mkl::lapack::geqrf(getQueue(), A.dims()[0], A.dims()[1], aBuf,
+                                     A.strides()[1], *t, *scratchpad,
+                                     scratchpad->size());
 
-        magma_geqrf3_gpu<T>(A.dims()[0], A.dims()[1], (*dA)(), A.getOffset(),
-                            A.strides()[1], &h_tau[0], (*dT)(), tmp.getOffset(),
-                            getQueue()(), &info);
-
+        // R1 = R(seq(M), seq(M));
         A.resetDims(dim4(M, M));
 
-        magmablas_swapdblk<T>(MN - 1, NB, (*dA)(), A.getOffset(),
-                              A.strides()[1], 1, (*dT)(),
-                              tmp.getOffset() + MN * NB, NB, 0, queue);
+        // Bt = tri_solve(R1, B);
+        B.resetDims(dim4(M, K));
 
-        OPENCL_BLAS_CHECK(
-            gpu_blas_trsm(OPENCL_BLAS_SIDE_LEFT, OPENCL_BLAS_TRIANGLE_UPPER,
-                          OPENCL_BLAS_CONJ_TRANS, OPENCL_BLAS_NON_UNIT_DIAGONAL,
-                          B.dims()[0], B.dims()[1], scalar<T>(1), (*dA)(),
-                          A.getOffset(), A.strides()[1], (*dB)(), B.getOffset(),
-                          B.strides()[1], 1, &queue, 0, nullptr, &event));
+        buffer<compute_t<T>> bBuf =
+            B.template getBufferWithOffset<compute_t<T>>();
+        // TODO: move to helper? trsm<T>(A, B, AF_MAT_CTRANS, true, true,
+        // false);
+        compute_t<T> alpha = scalar<compute_t<T>>(1);
+        ::oneapi::mkl::blas::trsm(
+            getQueue(), ::oneapi::mkl::side::left, ::oneapi::mkl::uplo::upper,
+            ::oneapi::mkl::transpose::conjtrans, ::oneapi::mkl::diag::nonunit,
+            B.dims()[0], B.dims()[1], alpha, aBuf, A.strides()[1], bBuf,
+            B.strides()[1]);
 
-        magmablas_swapdblk<T>(MN - 1, NB, (*dT)(), tmp.getOffset() + MN * NB,
-                              NB, 0, (*dA)(), A.getOffset(), A.strides()[1], 1,
-                              queue);
-
-#if UNMQR
-        int lwork = (B.dims()[0] - A.dims()[0] + NB) * (B.dims()[1] + 2 * NB);
-        vector<T> h_work(lwork);
+        // Bpad = pad(Bt, ..)
         B.resetDims(dim4(N, K));
-        magma_unmqr_gpu<T>(MagmaLeft, MagmaNoTrans, B.dims()[0], B.dims()[1],
-                           A.dims()[0], (*dA)(), A.getOffset(), A.strides()[1],
-                           &h_tau[0], (*dB)(), B.getOffset(), B.strides()[1],
-                           &h_work[0], lwork, (*dT)(), tmp.getOffset(), NB,
-                           queue, &info);
-#else
-        A.resetDims(dim4(N, M));
-        magma_ungqr_gpu<T>(A.dims()[0], A.dims()[1], min(M, N), (*dA)(),
-                           A.getOffset(), A.strides()[1], &h_tau[0], (*dT)(),
-                           tmp.getOffset(), NB, queue, &info);
 
-        Array<T> B_new = createEmptyArray<T>(dim4(A.dims()[0], B.dims()[1]));
-        T alpha        = scalar<T>(1.0);
-        T beta         = scalar<T>(0.0);
-        gemm<T>(B_new, AF_MAT_NONE, AF_MAT_NONE, &alpha, A, B, &beta);
-        B = B_new;
-#endif
+        // matmul(Q, Bpad)
+        if constexpr (std::is_floating_point<compute_t<T>>()) {
+            std::int64_t scratchpad_size =
+                ::oneapi::mkl::lapack::ormqr_scratchpad_size<compute_t<T>>(
+                    getQueue(), ::oneapi::mkl::side::left,
+                    ::oneapi::mkl::transpose::nontrans, B.dims()[0],
+                    B.dims()[1], A.dims()[0], A.strides()[1], B.strides()[1]);
+
+            auto scratchpad_ormqr = memAlloc<compute_t<T>>(scratchpad_size);
+            ::oneapi::mkl::lapack::ormqr(
+                getQueue(), ::oneapi::mkl::side::left,
+                ::oneapi::mkl::transpose::nontrans, B.dims()[0], B.dims()[1],
+                A.dims()[0], aBuf, A.strides()[1], *t, bBuf, B.strides()[1],
+                *scratchpad_ormqr, scratchpad_ormqr->size());
+        } else if constexpr (common::isComplex(static_cast<af::dtype>(
+                                 dtype_traits<compute_t<T>>::af_type))) {
+            std::int64_t scratchpad_size =
+                ::oneapi::mkl::lapack::unmqr_scratchpad_size<compute_t<T>>(
+                    getQueue(), ::oneapi::mkl::side::left,
+                    ::oneapi::mkl::transpose::nontrans, B.dims()[0],
+                    B.dims()[1], A.dims()[0], A.strides()[1], B.strides()[1]);
+
+            auto scratchpad_unmqr = memAlloc<compute_t<T>>(scratchpad_size);
+            ::oneapi::mkl::lapack::unmqr(
+                getQueue(), ::oneapi::mkl::side::left,
+                ::oneapi::mkl::transpose::nontrans, B.dims()[0], B.dims()[1],
+                A.dims()[0], aBuf, A.strides()[1], *t, bBuf, B.strides()[1],
+                *scratchpad_unmqr, scratchpad_unmqr->size());
+        }
+
     } else if (M > N) {
         // Least squres for this case is solved using the following
         // solve(A, B) == tri_solve(R1, Bt);
@@ -204,56 +227,61 @@ Array<T> leastSquares(const Array<T> &a, const Array<T> &b) {
         Array<T> A = copyArray<T>(a);
         B          = copyArray(b);
 
-        int MN = min(M, N);
-        int NB = magma_get_geqrf_nb<T>(M);
+        // Get workspace needed for QR
+        std::int64_t scratchpad_size =
+            ::oneapi::mkl::lapack::geqrf_scratchpad_size<compute_t<T>>(
+                getQueue(), M, N, A.strides()[1]);
 
-        int NUM      = (2 * MN + ((N + 31) / 32) * 32) * NB;
-        Array<T> tmp = createEmptyArray<T>(dim4(NUM));
+        auto scratchpad = memAlloc<compute_t<T>>(scratchpad_size);
+        auto t          = memAlloc<compute_t<T>>(MN);
 
-        vector<T> h_tau(NUM);
+        buffer<compute_t<T>> aBuf =
+            A.template getBufferWithOffset<compute_t<T>>();
+        // In place Perform in place QR
+        ::oneapi::mkl::lapack::geqrf(getQueue(), M, N, aBuf, A.strides()[1], *t,
+                                     *scratchpad, scratchpad->size());
 
-        int info      = 0;
-        Buffer *A_buf = A.get();
-        Buffer *B_buf = B.get();
-        Buffer *dT    = tmp.get();
+        // matmul(Q1, B)
+        buffer<compute_t<T>> bBuf =
+            B.template getBufferWithOffset<compute_t<T>>();
+        if constexpr (std::is_floating_point<compute_t<T>>()) {
+            std::int64_t scratchpad_size =
+                ::oneapi::mkl::lapack::ormqr_scratchpad_size<compute_t<T>>(
+                    getQueue(), ::oneapi::mkl::side::left,
+                    ::oneapi::mkl::transpose::trans, M, K, N, A.strides()[1],
+                    b.strides()[1]);
 
-        magma_geqrf3_gpu<T>(M, N, (*A_buf)(), A.getOffset(), A.strides()[1],
-                            &h_tau[0], (*dT)(), tmp.getOffset(), getQueue()(),
-                            &info);
+            auto scratchpad_ormqr = memAlloc<compute_t<T>>(scratchpad_size);
+            ::oneapi::mkl::lapack::ormqr(getQueue(), ::oneapi::mkl::side::left,
+                                         ::oneapi::mkl::transpose::trans, M, K,
+                                         N, aBuf, A.strides()[1], *t, bBuf,
+                                         b.strides()[1], *scratchpad_ormqr,
+                                         scratchpad_ormqr->size());
+        } else if constexpr (common::isComplex(static_cast<af::dtype>(
+                                 dtype_traits<compute_t<T>>::af_type))) {
+            std::int64_t scratchpad_size =
+                ::oneapi::mkl::lapack::unmqr_scratchpad_size<compute_t<T>>(
+                    getQueue(), ::oneapi::mkl::side::left,
+                    ::oneapi::mkl::transpose::conjtrans, M, K, N,
+                    A.strides()[1], b.strides()[1]);
 
-        int NRHS   = B.dims()[1];
-        int lhwork = (M - N + NB) * (NRHS + NB) + NRHS * NB;
-
-        vector<T> h_work(lhwork);
-        h_work[0] = scalar<T>(lhwork);
-
-        magma_unmqr_gpu<T>(MagmaLeft, MagmaConjTrans, M, NRHS, N, (*A_buf)(),
-                           A.getOffset(), A.strides()[1], &h_tau[0], (*B_buf)(),
-                           B.getOffset(), B.strides()[1], &h_work[0], lhwork,
-                           (*dT)(), tmp.getOffset(), NB, queue, &info);
-
-        magmablas_swapdblk<T>(MN - 1, NB, (*A_buf)(), A.getOffset(),
-                              A.strides()[1], 1, (*dT)(),
-                              tmp.getOffset() + NB * MN, NB, 0, queue);
-
-        if (getActivePlatform() == AFCL_PLATFORM_NVIDIA) {
-            Array<T> AT    = transpose<T>(A, true);
-            Buffer *AT_buf = AT.get();
-            OPENCL_BLAS_CHECK(gpu_blas_trsm(
-                OPENCL_BLAS_SIDE_LEFT, OPENCL_BLAS_TRIANGLE_LOWER,
-                OPENCL_BLAS_CONJ_TRANS, OPENCL_BLAS_NON_UNIT_DIAGONAL, N, NRHS,
-                scalar<T>(1), (*AT_buf)(), AT.getOffset(), AT.strides()[1],
-                (*B_buf)(), B.getOffset(), B.strides()[1], 1, &queue, 0,
-                nullptr, &event));
-        } else {
-            OPENCL_BLAS_CHECK(gpu_blas_trsm(
-                OPENCL_BLAS_SIDE_LEFT, OPENCL_BLAS_TRIANGLE_UPPER,
-                OPENCL_BLAS_NO_TRANS, OPENCL_BLAS_NON_UNIT_DIAGONAL, N, NRHS,
-                scalar<T>(1), (*A_buf)(), A.getOffset(), A.strides()[1],
-                (*B_buf)(), B.getOffset(), B.strides()[1], 1, &queue, 0,
-                nullptr, &event));
+            auto scratchpad_unmqr = memAlloc<compute_t<T>>(scratchpad_size);
+            ::oneapi::mkl::lapack::unmqr(getQueue(), ::oneapi::mkl::side::left,
+                                         ::oneapi::mkl::transpose::conjtrans, M,
+                                         K, N, aBuf, A.strides()[1], *t, bBuf,
+                                         b.strides()[1], *scratchpad_unmqr,
+                                         scratchpad_unmqr->size());
         }
+
+        // tri_solve(R1, Bt)
+        A.resetDims(dim4(N, N));
         B.resetDims(dim4(N, K));
+
+        compute_t<T> alpha = scalar<compute_t<T>>(1);
+        ::oneapi::mkl::blas::trsm(
+            getQueue(), ::oneapi::mkl::side::left, ::oneapi::mkl::uplo::upper,
+            ::oneapi::mkl::transpose::nontrans, ::oneapi::mkl::diag::nonunit, N,
+            K, alpha, aBuf, A.strides()[1], bBuf, B.strides()[1]);
     }
 
     return B;
@@ -262,53 +290,30 @@ Array<T> leastSquares(const Array<T> &a, const Array<T> &b) {
 template<typename T>
 Array<T> triangleSolve(const Array<T> &A, const Array<T> &b,
                        const af_mat_prop options) {
-    gpu_blas_trsm_func<T> gpu_blas_trsm;
+    Array<compute_t<T>> B = copyArray<T>(b);
 
-    Array<T> B = copyArray<T>(b);
+    compute_t<T> alpha       = scalar<compute_t<T>>(1);
+    ::oneapi::mkl::uplo uplo = (options & AF_MAT_UPPER)
+                                   ? ::oneapi::mkl::uplo::upper
+                                   : ::oneapi::mkl::uplo::lower;
 
-    int N    = B.dims()[0];
-    int NRHS = B.dims()[1];
+    ::oneapi::mkl::diag unitdiag = (options & AF_MAT_DIAG_UNIT)
+                                       ? ::oneapi::mkl::diag::unit
+                                       : ::oneapi::mkl::diag::nonunit;
 
-    const Buffer *A_buf = A.get();
-    Buffer *B_buf       = B.get();
+    buffer<compute_t<T>> aBuf = A.template getBufferWithOffset<compute_t<T>>();
+    buffer<compute_t<T>> bBuf = B.template getBufferWithOffset<compute_t<T>>();
 
-    cl_event event         = 0;
-    cl_command_queue queue = getQueue()();
-
-    if (getActivePlatform() == AFCL_PLATFORM_NVIDIA &&
-        (options & AF_MAT_UPPER)) {
-        Array<T> AT = transpose<T>(A, true);
-
-        cl::Buffer *AT_buf = AT.get();
-        OPENCL_BLAS_CHECK(gpu_blas_trsm(
-            OPENCL_BLAS_SIDE_LEFT, OPENCL_BLAS_TRIANGLE_LOWER,
-            OPENCL_BLAS_CONJ_TRANS,
-            options & AF_MAT_DIAG_UNIT ? OPENCL_BLAS_UNIT_DIAGONAL
-                                       : OPENCL_BLAS_NON_UNIT_DIAGONAL,
-            N, NRHS, scalar<T>(1), (*AT_buf)(), AT.getOffset(), AT.strides()[1],
-            (*B_buf)(), B.getOffset(), B.strides()[1], 1, &queue, 0, nullptr,
-            &event));
-    } else {
-        OPENCL_BLAS_CHECK(gpu_blas_trsm(
-            OPENCL_BLAS_SIDE_LEFT,
-            options & AF_MAT_LOWER ? OPENCL_BLAS_TRIANGLE_LOWER
-                                   : OPENCL_BLAS_TRIANGLE_UPPER,
-            OPENCL_BLAS_NO_TRANS,
-            options & AF_MAT_DIAG_UNIT ? OPENCL_BLAS_UNIT_DIAGONAL
-                                       : OPENCL_BLAS_NON_UNIT_DIAGONAL,
-            N, NRHS, scalar<T>(1), (*A_buf)(), A.getOffset(), A.strides()[1],
-            (*B_buf)(), B.getOffset(), B.strides()[1], 1, &queue, 0, nullptr,
-            &event));
-    }
-
+    ::oneapi::mkl::blas::trsm(getQueue(), ::oneapi::mkl::side::left, uplo,
+                              ::oneapi::mkl::transpose::nontrans, unitdiag,
+                              B.dims()[0], B.dims()[1], alpha, aBuf,
+                              A.strides()[1], bBuf, B.strides()[1]);
     return B;
 }
 
 template<typename T>
 Array<T> solve(const Array<T> &a, const Array<T> &b,
                const af_mat_prop options) {
-    if (OpenCLCPUOffload()) { return cpu::solve(a, b, options); }
-
     if (options & AF_MAT_UPPER || options & AF_MAT_LOWER) {
         return triangleSolve<T>(a, b, options);
     }

@@ -1,9 +1,13 @@
-# Copyright (c) 2022, ArrayFire
-# All rights reserved.
+#Copyright(c) 2022, ArrayFire
+#All rights reserved.
 #
-# This file is distributed under 3-clause BSD license.
-# The complete license agreement can be obtained at:
-# http://arrayfire.com/licenses/BSD-3-Clause
+#This file is distributed under 3 - clause BSD license.
+#The complete license agreement can be obtained at:
+#http:  // arrayfire.com/licenses/BSD-3-Clause
+
+if(AF_BUILD_ONEAPI)
+    enable_language(SYCL)
+endif()
 
 include(InternalUtils)
 include(build_cl2hpp)
@@ -95,6 +99,7 @@ add_library(afoneapi
   ireduce.hpp
   jit.cpp
   jit/BufferNode.hpp
+  jit/ShiftNode.hpp
   jit/kernel_generators.hpp
   join.cpp
   join.hpp
@@ -117,6 +122,7 @@ add_library(afoneapi
   memory.cpp
   memory.hpp
   min.cpp
+  minmax_op.hpp
   moments.cpp
   moments.hpp
   morph.cpp
@@ -209,17 +215,29 @@ add_library(afoneapi
 target_sources(afoneapi
   PRIVATE
     kernel/KParam.hpp
+    kernel/accessors.hpp
     kernel/approx1.hpp
     kernel/approx2.hpp
     kernel/assign.hpp
     kernel/bilateral.hpp
+    kernel/convolve_separable.cpp
     kernel/diagonal.hpp
     kernel/diff.hpp
+    kernel/fftconvolve_common.hpp
+    kernel/fftconvolve_multiply.hpp
+    kernel/fftconvolve_pack.hpp
+    kernel/fftconvolve_pad.hpp
+    kernel/fftconvolve_reorder.hpp
+    kernel/histogram.hpp
+    kernel/iir.hpp
+    kernel/identity.hpp
     kernel/interp.hpp
     kernel/iota.hpp
-    kernel/histogram.hpp
+    kernel/ireduce.hpp
+    kernel/lu_split.hpp
     kernel/memcopy.hpp
     kernel/mean.hpp
+    kernel/pad_array_borders.hpp
     kernel/random_engine.hpp
     kernel/random_engine_write.hpp
     kernel/random_engine_mersenne.hpp
@@ -228,11 +246,16 @@ target_sources(afoneapi
     kernel/range.hpp
     kernel/reduce.hpp
     kernel/reduce_all.hpp
+    kernel/reduce_by_key.hpp
     kernel/reduce_first.hpp
     kernel/reduce_dim.hpp
     kernel/reorder.hpp
     kernel/scan_first.hpp
     kernel/scan_dim.hpp
+    kernel/sort.hpp
+    kernel/sort_by_key.hpp
+    kernel/sparse.hpp
+    kernel/sparse_arith.hpp
     kernel/transpose.hpp
     kernel/transpose_inplace.hpp
     kernel/triangle.hpp
@@ -241,6 +264,26 @@ target_sources(afoneapi
     kernel/wrap.hpp
     kernel/wrap_dilated.hpp
 )
+
+function(set_sycl_language)
+  foreach(target ${ARGV})
+    set_target_properties(${target}
+      PROPERTIES
+        LINKER_LANGUAGE SYCL)
+
+    get_target_property(TGT_SOURCES ${target} SOURCES)
+    if(NOT TGT_SOURCES)
+      get_target_property(TGT_SOURCES ${target} INTERFACE_SOURCES)
+    endif()
+
+    foreach(FILE ${TGT_SOURCES})
+      get_filename_component(FILE_EXTENSION ${FILE} EXT)
+      if(FILE_EXTENSION STREQUAL ".cpp")
+        set_source_files_properties(${FILE} PROPERTIES LANGUAGE SYCL)
+      endif()
+    endforeach()
+  endforeach()
+endfunction()
 
 set(kernel_src
   ${CMAKE_CURRENT_SOURCE_DIR}/../opencl/kernel/KParam.hpp
@@ -264,9 +307,12 @@ add_library(ArrayFire::afoneapi ALIAS afoneapi)
 
 arrayfire_set_default_cxx_flags(afoneapi)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/kernel/sort_by_key/CMakeLists.txt")
+
 target_include_directories(afoneapi
   SYSTEM PRIVATE
-    ${SYCL_INCLUDE_DIR})
+    ${SYCL_INCLUDE_DIR}
+)
 
 target_include_directories(afoneapi
   PUBLIC
@@ -280,38 +326,49 @@ target_include_directories(afoneapi
 
 target_compile_options(afoneapi
   PRIVATE
-    -fsycl
-    -qopenmp -qmkl=parallel
+  $<$<COMPILE_LANGUAGE:SYCL>:
+    -fno-sycl-id-queries-fit-in-int
     -sycl-std=2020
+    $<$<PLATFORM_ID:Linux>: -fno-sycl-rdc>
+    >
 )
 
 target_compile_definitions(afoneapi
   PRIVATE
     AF_ONEAPI
+    WITH_LINEAR_ALGEBRA
     CL_TARGET_OPENCL_VERSION=300
     CL_HPP_TARGET_OPENCL_VERSION=300
     CL_HPP_MINIMUM_OPENCL_VERSION=110
     CL_HPP_ENABLE_EXCEPTIONS
   )
 
+cmake_host_system_information(RESULT NumberOfThreads
+  QUERY NUMBER_OF_LOGICAL_CORES)
+
 target_link_libraries(afoneapi
   PRIVATE
-    -fsycl
-    -fno-lto
-    -fvisibility-inlines-hidden
     c_api_interface
     cpp_api_interface
+    oneapi_sort_by_key
     afcommon_interface
     OpenCL::OpenCL
     OpenCL::cl2hpp
-    -fsycl
-    -fsycl-device-code-split=per_kernel
-    -fsycl-link-huge-device-code
-    -qopenmp
-    -qmkl=parallel
+    -fno-sycl-id-queries-fit-in-int
+    $<$<PLATFORM_ID:Linux>:-fsycl-link-huge-device-code>
+    $<$<PLATFORM_ID:Linux>:-fvisibility-inlines-hidden>
+    $<$<PLATFORM_ID:Linux>:-fno-sycl-rdc>
+    -fsycl-max-parallel-link-jobs=${NumberOfThreads}
+    MKL::MKL_DPCPP
   )
+  set_sycl_language(afcommon_interface
+    oneapi_sort_by_key
+    c_api_interface
+    cpp_api_interface
+    afoneapi)
 
-af_split_debug_info(afoneapi ${AF_INSTALL_LIB_DIR})
+
+#af_split_debug_info(afoneapi ${AF_INSTALL_LIB_DIR})
 
 install(TARGETS afoneapi
   EXPORT ArrayFireoneAPITargets

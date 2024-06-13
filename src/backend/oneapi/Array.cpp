@@ -10,6 +10,7 @@
 #include <Array.hpp>
 
 #include <Param.hpp>
+#include <common/Logger.hpp>
 #include <common/MemoryManagerBase.hpp>
 #include <common/half.hpp>
 #include <common/jit/NodeIterator.hpp>
@@ -88,10 +89,17 @@ void verifyTypeSupport<arrayfire::common::half>() {
 }  // namespace
 
 template<typename T>
+void checkAndMigrate(const Array<T> &arr) {
+    if (arr.getDevId() != detail::getActiveDeviceId()) {
+        AF_ERROR("Input Array not created on current device", AF_ERR_DEVICE);
+    }
+}
+
+template<typename T>
 Array<T>::Array(const dim4 &dims)
     : info(getActiveDeviceId(), dims, 0, calcStrides(dims),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
-    , data(memAlloc<T>(info.elements()).release(), bufferFree<T>)
+    , data(memAlloc<T>(info.elements()).release(), memFree<T>)
     , data_dims(dims)
     , node()
     , owner(true) {}
@@ -112,7 +120,7 @@ template<typename T>
 Array<T>::Array(const dim4 &dims, const T *const in_data)
     : info(getActiveDeviceId(), dims, 0, calcStrides(dims),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
-    , data(memAlloc<T>(info.elements()).release(), bufferFree<T>)
+    , data(memAlloc<T>(info.elements()).release(), memFree<T>)
     , data_dims(dims)
     , node()
     , owner(true) {
@@ -125,10 +133,10 @@ Array<T>::Array(const dim4 &dims, const T *const in_data)
     static_assert(
         offsetof(Array<T>, info) == 0,
         "Array<T>::info must be the first member variable of Array<T>");
-    // getQueue().enqueueWriteBuffer(*data.get(), CL_TRUE, 0,
-    // sizeof(T) * info.elements(), in_data);
     getQueue()
-        .submit([&](sycl::handler &h) { h.copy(in_data, data->get_access(h)); })
+        .submit([&](sycl::handler &h) {
+            h.copy(in_data, data->get_access(h, sycl::range(info.elements())));
+        })
         .wait();
 }
 
@@ -138,14 +146,15 @@ Array<T>::Array(const af::dim4 &dims, buffer<T> *const mem, size_t offset,
     : info(getActiveDeviceId(), dims, 0, calcStrides(dims),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
     , data(copy ? memAlloc<T>(info.elements()).release() : new buffer<T>(*mem),
-           bufferFree<T>)
+           memFree<T>)
     , data_dims(dims)
     , node()
     , owner(true) {
     if (copy) {
         getQueue()
             .submit([&](sycl::handler &h) {
-                h.copy(mem->get_access(h), data->get_access(h));
+                h.copy(mem->get_access(h, sycl::range(info.elements())),
+                       data->get_access(h));
             })
             .wait();
     }
@@ -171,7 +180,7 @@ Array<T>::Array(Param<T> &tmp, bool owner_)
                 tmp.info.strides[3]),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
     , data(
-          tmp.data, owner_ ? bufferFree<T> : [](buffer<T> * /*unused*/) {})
+          tmp.data, owner_ ? memFree<T> : [](sycl::buffer<T> * /*unused*/) {})
     , data_dims(dim4(tmp.info.dims[0], tmp.info.dims[1], tmp.info.dims[2],
                      tmp.info.dims[3]))
     , node()
@@ -193,8 +202,9 @@ Array<T>::Array(const dim4 &dims, const dim4 &strides, dim_t offset_,
     } else {
         data = memAlloc<T>(info.elements());
         getQueue()
-            .submit(
-                [&](sycl::handler &h) { h.copy(in_data, data->get_access(h)); })
+            .submit([&](sycl::handler &h) {
+                h.copy(in_data, data->get_access(h, sycl::range(info.total())));
+            })
             .wait();
     }
 }
@@ -205,7 +215,7 @@ void Array<T>::eval() {
 
     this->setId(getActiveDeviceId());
     data = std::shared_ptr<sycl::buffer<T>>(
-        memAlloc<T>(info.elements()).release(), bufferFree<T>);
+        memAlloc<T>(info.elements()).release(), memFree<T>);
 
     // Do not replace this with cast operator
     KParam info = {{dims()[0], dims()[1], dims()[2], dims()[3]},
@@ -256,7 +266,7 @@ void evalMultiple(vector<Array<T> *> arrays) {
 
         array->setId(getActiveDeviceId());
         array->data = std::shared_ptr<buffer<T>>(
-            memAlloc<T>(info.elements()).release(), bufferFree<T>);
+            memAlloc<T>(info.elements()).release(), memFree<T>);
 
         // Do not replace this with cast operator
         KParam kInfo = {
@@ -279,7 +289,7 @@ template<typename T>
 Node_ptr Array<T>::getNode() {
     if (node) { return node; }
 
-    AParam<T> info = *this;
+    AParam<T, sycl::access_mode::read> info = *this;
     unsigned bytes = this->dims().elements() * sizeof(T);
     auto nn        = bufferNodePtr<T>();
     nn->setData(info, data, bytes, isLinear());
@@ -309,8 +319,13 @@ Node_ptr Array<T>::getNode() const {
 template<typename T>
 kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
     if (!evalFlag()) { return kJITHeuristics::Pass; }
+    static auto getLogger = [&] { return common::loggerFactory("jit"); };
     for (const Node *n : root_nodes) {
         if (n->getHeight() > static_cast<int>(getMaxJitSize())) {
+            AF_TRACE(
+                "JIT tree evaluated because of tree height exceeds limit: {} > "
+                "{}",
+                n->getHeight(), getMaxJitSize());
             return kJITHeuristics::TreeHeight;
         }
     }
@@ -383,24 +398,24 @@ kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
 
         bool isParamLimit = param_size >= max_param_size;
 
-        if (isParamLimit) { return kJITHeuristics::KernelParameterSize; }
-        // TODO(umar): check buffer limit for JIT kernel generation
-        // if (isBufferLimit) { return kJITHeuristics::MemoryPressure; }
+        if (isParamLimit) {
+            AF_TRACE(
+                "JIT tree evaluated because of kernel parameter size: {} >= {}",
+                param_size, max_param_size);
+            return kJITHeuristics::KernelParameterSize;
+        }
+        if (isBufferLimit) {
+            AF_TRACE("JIT tree evaluated because of memory pressure: {}",
+                     info.total_buffer_size);
+            return kJITHeuristics::MemoryPressure;
+        }
     }
     return kJITHeuristics::Pass;
 }
 
-// Doesn't make sense with sycl::buffer
-// TODO: accessors? or return sycl::buffer?
-// TODO: return accessor.get_pointer() for access::target::global_buffer or
-// (host_buffer?)
 template<typename T>
 void *getDevicePtr(const Array<T> &arr) {
     const buffer<T> *buf = arr.device();
-    // if (!buf) { return NULL; }
-    // memLock(buf);
-    // cl_mem mem = (*buf)();
-    ONEAPI_NOT_SUPPORTED("pointer to sycl::buffer should be accessor");
     return (void *)buf;
 }
 
@@ -487,15 +502,12 @@ void writeHostDataArray(Array<T> &arr, const T *const data,
     if (!arr.isOwner()) { arr = copyArray<T>(arr); }
     getQueue()
         .submit([&](sycl::handler &h) {
-            buffer<T> &buf = *arr.get();
-            // auto offset_acc = buf.get_access(h, sycl::range, sycl::id<>)
-            // TODO: offset accessor
-            auto offset_acc = buf.get_access(h);
-            h.copy(data, offset_acc);
+            auto host_acc =
+                arr.get()->template get_access<sycl::access_mode::write>(
+                    h, sycl::range(bytes / sizeof(T)), arr.getOffset());
+            h.copy(data, host_acc);
         })
         .wait();
-    // getQueue().enqueueWriteBuffer(*arr.get(), CL_TRUE, arr.getOffset(),
-    // bytes, data);
 }
 
 template<typename T>
@@ -503,14 +515,15 @@ void writeDeviceDataArray(Array<T> &arr, const void *const data,
                           const size_t bytes) {
     if (!arr.isOwner()) { arr = copyArray<T>(arr); }
 
-    // clRetainMemObject(
-    //    reinterpret_cast<buffer<T> *>(const_cast<void *>(data)));
-    // buffer<T> data_buf =
-    //  buffer<T>(reinterpret_cast<buffer<T>*>(const_cast<void *>(data)));
-
-    ONEAPI_NOT_SUPPORTED("writeDeviceDataArray not supported");
-    // getQueue().enqueueCopyBuffer(data_buf, buf, 0,
-    // static_cast<size_t>(arr.getOffset()), bytes);
+    sycl::buffer<T> *dataptr =
+        static_cast<sycl::buffer<T> *>(const_cast<void *>(data));
+    getQueue().submit([&](sycl::handler &h) {
+        auto src_acc = dataptr->template get_access<sycl::access_mode::read>(
+            h, sycl::range(bytes / sizeof(T)));
+        auto dst_acc = arr.get()->template get_access<sycl::access_mode::write>(
+            h, sycl::range(bytes / sizeof(T)), arr.getOffset());
+        h.copy(src_acc, dst_acc);
+    });
 }
 
 template<typename T>
@@ -558,7 +571,8 @@ size_t Array<T>::getAllocatedBytes() const {
     template kJITHeuristics passesJitHeuristics<T>(span<Node *> node);       \
     template void *getDevicePtr<T>(const Array<T> &arr);                     \
     template void Array<T>::setDataDims(const dim4 &new_dims);               \
-    template size_t Array<T>::getAllocatedBytes() const;
+    template size_t Array<T>::getAllocatedBytes() const;                     \
+    template void checkAndMigrate<T>(const Array<T> &arr);
 
 INSTANTIATE(float)
 INSTANTIATE(double)

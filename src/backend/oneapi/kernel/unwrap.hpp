@@ -15,6 +15,8 @@
 #include <debug_oneapi.hpp>
 #include <kernel/default_config.hpp>
 
+#include <sycl/sycl.hpp>
+
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
@@ -147,7 +149,7 @@ void unwrap(Param<T> out, const Param<T> in, const dim_t wx, const dim_t wy,
         reps = divup((wx * wy), TX);
     } else {
         TX   = THREADS_X;
-        TY   = THREADS_X;
+        TY   = THREADS_Y;
         BX   = divup(out.info.dims[0], TX);
         reps = divup((wx * wy), TY);
     }

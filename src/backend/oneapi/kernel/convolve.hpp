@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2023, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -12,7 +12,10 @@
 #include <common/dispatch.hpp>
 #include <common/kernel_cache.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <af/defines.h>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -105,14 +108,6 @@ void memcpyBuffer(sycl::buffer<T, 1> &dest, sycl::buffer<T, 1> &src,
         h.copy(srcAcc, destAcc);
     });
 }
-
-template<typename T>
-using local_accessor = sycl::accessor<T, 1, sycl::access::mode::read_write,
-                                      sycl::access::target::local>;
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 #include "convolve1.hpp"
 #include "convolve2.hpp"

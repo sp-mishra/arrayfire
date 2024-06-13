@@ -128,6 +128,9 @@ static af_err af_arith(af_array *out, const af_array lhs, const af_array rhs,
 
         if (batchMode || linfo.dims() == rinfo.dims()) {
             dim4 odims = getOutDims(linfo.dims(), rinfo.dims(), batchMode);
+            if (odims.ndims() == 0) {
+                return af_create_handle(out, 0, nullptr, otype);
+            }
 
             switch (otype) {
                 case f32: res = arithOp<float, op>(lhs, rhs, odims); break;
@@ -146,6 +149,9 @@ static af_err af_arith(af_array *out, const af_array lhs, const af_array rhs,
                 default: TYPE_ERROR(0, otype);
             }
         } else {
+            if (linfo.ndims() == 0 && rinfo.ndims() == 0) {
+                return af_create_handle(out, 0, nullptr, otype);
+            }
             switch (otype) {
                 case f32: res = arithOpBroadcast<float, op>(lhs, rhs); break;
                 case f64: res = arithOpBroadcast<double, op>(lhs, rhs); break;
@@ -178,8 +184,11 @@ static af_err af_arith_real(af_array *out, const af_array lhs,
         const ArrayInfo &rinfo = getInfo(rhs);
 
         dim4 odims = getOutDims(linfo.dims(), rinfo.dims(), batchMode);
-
         const af_dtype otype = implicit(linfo.getType(), rinfo.getType());
+        if (odims.ndims() == 0) {
+            return af_create_handle(out, 0, nullptr, otype);
+        }
+
         af_array res;
         switch (otype) {
             case f32: res = arithOp<float, op>(lhs, rhs, odims); break;
@@ -268,87 +277,101 @@ static af_err af_arith_sparse_dense(af_array *out, const af_array lhs,
 
 af_err af_add(af_array *out, const af_array lhs, const af_array rhs,
               const bool batchMode) {
-    // Check if inputs are sparse
-    const ArrayInfo &linfo = getInfo(lhs, false, true);
-    const ArrayInfo &rinfo = getInfo(rhs, false, true);
+    try {
+        // Check if inputs are sparse
+        const ArrayInfo &linfo = getInfo(lhs, false);
+        const ArrayInfo &rinfo = getInfo(rhs, false);
 
-    if (linfo.isSparse() && rinfo.isSparse()) {
-        return af_arith_sparse<af_add_t>(out, lhs, rhs);
+        if (linfo.isSparse() && rinfo.isSparse()) {
+            return af_arith_sparse<af_add_t>(out, lhs, rhs);
+        }
+        if (linfo.isSparse() && !rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_add_t>(out, lhs, rhs);
+        }
+        if (!linfo.isSparse() && rinfo.isSparse()) {
+            // second operand(Array) of af_arith call should be dense
+            return af_arith_sparse_dense<af_add_t>(out, rhs, lhs, true);
+        }
+        return af_arith<af_add_t>(out, lhs, rhs, batchMode);
     }
-    if (linfo.isSparse() && !rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_add_t>(out, lhs, rhs);
-    }
-    if (!linfo.isSparse() && rinfo.isSparse()) {
-        // second operand(Array) of af_arith call should be dense
-        return af_arith_sparse_dense<af_add_t>(out, rhs, lhs, true);
-    }
-    return af_arith<af_add_t>(out, lhs, rhs, batchMode);
+    CATCHALL;
 }
 
 af_err af_mul(af_array *out, const af_array lhs, const af_array rhs,
               const bool batchMode) {
-    // Check if inputs are sparse
-    const ArrayInfo &linfo = getInfo(lhs, false, true);
-    const ArrayInfo &rinfo = getInfo(rhs, false, true);
+    try {
+        // Check if inputs are sparse
+        const ArrayInfo &linfo = getInfo(lhs, false);
+        const ArrayInfo &rinfo = getInfo(rhs, false);
 
-    if (linfo.isSparse() && rinfo.isSparse()) {
-        // return af_arith_sparse<af_mul_t>(out, lhs, rhs);
-        // MKL doesn't have mul or div support yet, hence
-        // this is commented out although alternative cpu code exists
-        return AF_ERR_NOT_SUPPORTED;
+        if (linfo.isSparse() && rinfo.isSparse()) {
+            // return af_arith_sparse<af_mul_t>(out, lhs, rhs);
+            // MKL doesn't have mul or div support yet, hence
+            // this is commented out although alternative cpu code exists
+            return AF_ERR_NOT_SUPPORTED;
+        }
+        if (linfo.isSparse() && !rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_mul_t>(out, lhs, rhs);
+        }
+        if (!linfo.isSparse() && rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_mul_t>(
+                out, rhs, lhs,
+                true);  // dense should be rhs
+        }
+        return af_arith<af_mul_t>(out, lhs, rhs, batchMode);
     }
-    if (linfo.isSparse() && !rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_mul_t>(out, lhs, rhs);
-    }
-    if (!linfo.isSparse() && rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_mul_t>(out, rhs, lhs,
-                                               true);  // dense should be rhs
-    }
-    return af_arith<af_mul_t>(out, lhs, rhs, batchMode);
+    CATCHALL;
 }
 
 af_err af_sub(af_array *out, const af_array lhs, const af_array rhs,
               const bool batchMode) {
-    // Check if inputs are sparse
-    const ArrayInfo &linfo = getInfo(lhs, false, true);
-    const ArrayInfo &rinfo = getInfo(rhs, false, true);
+    try {
+        // Check if inputs are sparse
+        const ArrayInfo &linfo = getInfo(lhs, false);
+        const ArrayInfo &rinfo = getInfo(rhs, false);
 
-    if (linfo.isSparse() && rinfo.isSparse()) {
-        return af_arith_sparse<af_sub_t>(out, lhs, rhs);
+        if (linfo.isSparse() && rinfo.isSparse()) {
+            return af_arith_sparse<af_sub_t>(out, lhs, rhs);
+        }
+        if (linfo.isSparse() && !rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_sub_t>(out, lhs, rhs);
+        }
+        if (!linfo.isSparse() && rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_sub_t>(
+                out, rhs, lhs,
+                true);  // dense should be rhs
+        }
+        return af_arith<af_sub_t>(out, lhs, rhs, batchMode);
     }
-    if (linfo.isSparse() && !rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_sub_t>(out, lhs, rhs);
-    }
-    if (!linfo.isSparse() && rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_sub_t>(out, rhs, lhs,
-                                               true);  // dense should be rhs
-    }
-    return af_arith<af_sub_t>(out, lhs, rhs, batchMode);
+    CATCHALL;
 }
 
 af_err af_div(af_array *out, const af_array lhs, const af_array rhs,
               const bool batchMode) {
-    // Check if inputs are sparse
-    const ArrayInfo &linfo = getInfo(lhs, false, true);
-    const ArrayInfo &rinfo = getInfo(rhs, false, true);
+    try {
+        // Check if inputs are sparse
+        const ArrayInfo &linfo = getInfo(lhs, false);
+        const ArrayInfo &rinfo = getInfo(rhs, false);
 
-    if (linfo.isSparse() && rinfo.isSparse()) {
-        // return af_arith_sparse<af_div_t>(out, lhs, rhs);
-        // MKL doesn't have mul or div support yet, hence
-        // this is commented out although alternative cpu code exists
-        return AF_ERR_NOT_SUPPORTED;
+        if (linfo.isSparse() && rinfo.isSparse()) {
+            // return af_arith_sparse<af_div_t>(out, lhs, rhs);
+            // MKL doesn't have mul or div support yet, hence
+            // this is commented out although alternative cpu code exists
+            return AF_ERR_NOT_SUPPORTED;
+        }
+        if (linfo.isSparse() && !rinfo.isSparse()) {
+            return af_arith_sparse_dense<af_div_t>(out, lhs, rhs);
+        }
+        if (!linfo.isSparse() && rinfo.isSparse()) {
+            // Division by sparse is currently not allowed - for convinence of
+            // dealing with division by 0
+            // return af_arith_sparse_dense<af_div_t>(out, rhs, lhs, true); //
+            // dense should be rhs
+            return AF_ERR_NOT_SUPPORTED;
+        }
+        return af_arith<af_div_t>(out, lhs, rhs, batchMode);
     }
-    if (linfo.isSparse() && !rinfo.isSparse()) {
-        return af_arith_sparse_dense<af_div_t>(out, lhs, rhs);
-    }
-    if (!linfo.isSparse() && rinfo.isSparse()) {
-        // Division by sparse is currently not allowed - for convinence of
-        // dealing with division by 0
-        // return af_arith_sparse_dense<af_div_t>(out, rhs, lhs, true); // dense
-        // should be rhs
-        return AF_ERR_NOT_SUPPORTED;
-    }
-    return af_arith<af_div_t>(out, lhs, rhs, batchMode);
+    CATCHALL;
 }
 
 af_err af_maxof(af_array *out, const af_array lhs, const af_array rhs,
@@ -462,6 +485,9 @@ af_err af_atan2(af_array *out, const af_array lhs, const af_array rhs,
         const ArrayInfo &rinfo = getInfo(rhs);
 
         dim4 odims = getOutDims(linfo.dims(), rinfo.dims(), batchMode);
+        if (odims.ndims() == 0) {
+            return af_create_handle(out, 0, nullptr, type);
+        }
 
         af_array res;
         switch (type) {
@@ -490,6 +516,10 @@ af_err af_hypot(af_array *out, const af_array lhs, const af_array rhs,
         const ArrayInfo &rinfo = getInfo(rhs);
 
         dim4 odims = getOutDims(linfo.dims(), rinfo.dims(), batchMode);
+
+        if (odims.ndims() == 0) {
+            return af_create_handle(out, 0, nullptr, type);
+        }
 
         af_array res;
         switch (type) {
@@ -522,6 +552,10 @@ static af_err af_logic(af_array *out, const af_array lhs, const af_array rhs,
         const ArrayInfo &rinfo = getInfo(rhs);
 
         dim4 odims = getOutDims(linfo.dims(), rinfo.dims(), batchMode);
+
+        if (odims.ndims() == 0) {
+            return af_create_handle(out, 0, nullptr, type);
+        }
 
         af_array res;
         switch (type) {

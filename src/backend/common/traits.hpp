@@ -68,6 +68,12 @@ constexpr bool isFloating(af::dtype type) {
     return (!isInteger(type) && !isBool(type));
 }
 
+template<typename T, typename U, typename... Args>
+constexpr bool is_any_of() {
+    AF_IF_CONSTEXPR(!sizeof...(Args)) { return std::is_same<T, U>::value; }
+    else { return std::is_same<T, U>::value || is_any_of<T, Args...>(); }
+}
+
 }  // namespace
 }  // namespace common
 }  // namespace arrayfire

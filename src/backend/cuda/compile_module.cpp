@@ -39,6 +39,8 @@
 #include <nvrtc_kernel_headers/traits_hpp.hpp>
 #include <nvrtc_kernel_headers/types_hpp.hpp>
 #include <nvrtc_kernel_headers/utility_hpp.hpp>
+#include <nvrtc_kernel_headers/vector_functions_h.hpp>
+#include <nvrtc_kernel_headers/vector_types_h.hpp>
 #include <nvrtc_kernel_headers/version_h.hpp>
 #include <optypes.hpp>
 #include <platform.hpp>
@@ -155,15 +157,12 @@ Module compileModule(const string &moduleKey, span<const string> sources,
     using namespace arrayfire::cuda;
     if (sourceIsJIT) {
         constexpr const char *header_names[] = {
-            "utility",
-            "cuda_fp16.hpp",
-            "cuda_fp16.h",
+            "utility",        "cuda_fp16.hpp",      "cuda_fp16.h",
+            "vector_types.h", "vector_functions.h",
         };
         constexpr size_t numHeaders = extent<decltype(header_names)>::value;
         array<const char *, numHeaders> headers = {
-            "",
-            cuda_fp16_hpp,
-            cuda_fp16_h,
+            "", cuda_fp16_hpp, cuda_fp16_h, vector_types_h, vector_functions_h,
         };
         static_assert(headers.size() == numHeaders,
                       "headers array contains fewer sources than header_names");
@@ -176,7 +175,7 @@ Module compileModule(const string &moduleKey, span<const string> sources,
             "stdbool.h",       // DUMMY ENTRY TO SATISFY af/defines.h inclusion
             "stdlib.h",        // DUMMY ENTRY TO SATISFY af/defines.h inclusion
             "vector_types.h",  // DUMMY ENTRY TO SATISFY cuComplex_h inclusion
-            "utility",         // DUMMY ENTRY TO SATISFY cuda_fp16.hpp inclusion
+            "utility",         // DUMMY ENTRY TO SATISFY utility inclusion
             "backend.hpp",
             "cuComplex.h",
             "jit.cuh",
@@ -201,6 +200,7 @@ Module compileModule(const string &moduleKey, span<const string> sources,
             "dims_param.hpp",
             "common/internal_enums.hpp",
             "minmax_op.hpp",
+            "vector_functions.h",
         };
 
         constexpr size_t numHeaders = extent<decltype(includeNames)>::value;
@@ -234,6 +234,7 @@ Module compileModule(const string &moduleKey, span<const string> sources,
             string(dims_param_hpp, dims_param_hpp_len),
             string(internal_enums_hpp, internal_enums_hpp_len),
             string(minmax_op_hpp, minmax_op_hpp_len),
+            string(vector_functions_h, vector_functions_h_len),
         }};
 
         static const char *headers[] = {
@@ -251,7 +252,7 @@ Module compileModule(const string &moduleKey, span<const string> sources,
             sourceStrings[22].c_str(), sourceStrings[23].c_str(),
             sourceStrings[24].c_str(), sourceStrings[25].c_str(),
             sourceStrings[26].c_str(), sourceStrings[27].c_str(),
-            sourceStrings[28].c_str()};
+            sourceStrings[28].c_str(), sourceStrings[29].c_str()};
         static_assert(extent<decltype(headers)>::value == numHeaders,
                       "headers array contains fewer sources than includeNames");
         NVRTC_CHECK(nvrtcCreateProgram(&prog, sources[0].c_str(),

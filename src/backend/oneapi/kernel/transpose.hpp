@@ -13,7 +13,10 @@
 #include <common/dispatch.hpp>
 #include <debug_oneapi.hpp>
 #include <err_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <traits.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -42,19 +45,15 @@ cdouble getConjugate(const cdouble &in) {
     return std::conj(in);
 }
 
-template<typename T, int dimensions>
-using local_accessor =
-    sycl::accessor<T, dimensions, sycl::access::mode::read_write,
-                   sycl::access::target::local>;
-
 template<typename T>
 class transposeKernel {
    public:
-    transposeKernel(sycl::accessor<T> oData, const KParam out,
-                    const sycl::accessor<T> iData, const KParam in,
-                    const int blocksPerMatX, const int blocksPerMatY,
-                    const bool conjugate, const bool IS32MULTIPLE,
-                    local_accessor<T, 1> shrdMem)
+    transposeKernel(sycl::accessor<T, 1, sycl::access::mode::write> oData,
+                    const KParam out,
+                    const sycl::accessor<T, 1, sycl::access::mode::read> iData,
+                    const KParam in, const int blocksPerMatX,
+                    const int blocksPerMatY, const bool conjugate,
+                    const bool IS32MULTIPLE, sycl::local_accessor<T, 1> shrdMem)
         : oData_(oData)
         , out_(out)
         , iData_(iData)
@@ -96,7 +95,8 @@ class transposeKernel {
 
         // offset in_ and out_ based on batch id
         // also add the subBuffer offsets
-        T *iDataPtr = iData_.get_pointer(), *oDataPtr = oData_.get_pointer();
+        const T *iDataPtr = iData_.get_pointer();
+        T *oDataPtr       = oData_.get_pointer();
         iDataPtr += batchId_x * in_.strides[2] + batchId_y * in_.strides[3] +
                     in_.offset;
         oDataPtr += batchId_x * out_.strides[2] + batchId_y * out_.strides[3] +
@@ -124,15 +124,15 @@ class transposeKernel {
     }
 
    private:
-    sycl::accessor<T> oData_;
+    sycl::accessor<T, 1, sycl::access::mode::write> oData_;
     KParam out_;
-    sycl::accessor<T> iData_;
+    sycl::accessor<T, 1, sycl::access::mode::read> iData_;
     KParam in_;
     int blocksPerMatX_;
     int blocksPerMatY_;
     bool conjugate_;
     bool IS32MULTIPLE_;
-    local_accessor<T, 1> shrdMem_;
+    sycl::local_accessor<T, 1> shrdMem_;
 };
 
 template<typename T>
@@ -147,10 +147,10 @@ void transpose(Param<T> out, const Param<T> in, const bool conjugate,
                               blk_y * local[1] * in.info.dims[3]};
 
     getQueue().submit([&](sycl::handler &h) {
-        auto r = in.data->get_access(h);
-        auto q = out.data->get_access(h);
+        auto r = in.data->template get_access<sycl::access::mode::read>(h);
+        auto q = out.data->template get_access<sycl::access::mode::write>(h);
 
-        auto shrdMem = local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
+        auto shrdMem = sycl::local_accessor<T, 1>(TILE_DIM * (TILE_DIM + 1), h);
 
         h.parallel_for(sycl::nd_range{global, local},
                        transposeKernel<T>(q, out.info, r, in.info, blk_x, blk_y,

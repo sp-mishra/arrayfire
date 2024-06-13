@@ -9,13 +9,16 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
 #include <Param.hpp>
 #include <common/dispatch.hpp>
 #include <common/half.hpp>
 #include <common/traits.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
+#include <sycl/sycl.hpp>
 #include <traits.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <algorithm>
 #include <string>
@@ -25,6 +28,27 @@ namespace arrayfire {
 namespace oneapi {
 namespace kernel {
 
+template<typename T>
+using factortypes = typename std::conditional<std::is_same_v<T, double> ||
+                                                  std::is_same_v<T, cdouble>,
+                                              double, float>::type;
+
+template<typename T, typename FACTORTYPE = factortypes<T>>
+inline T scale(T value, FACTORTYPE factor) {
+    return (T)(FACTORTYPE(value) * factor);
+}
+
+template<>
+inline cfloat scale<cfloat, float>(cfloat value, float factor) {
+    return cfloat{static_cast<float>(value.real() * factor),
+                  static_cast<float>(value.imag() * factor)};
+}
+
+template<>
+inline cdouble scale<cdouble, double>(cdouble value, double factor) {
+    return cdouble{value.real() * factor, value.imag() * factor};
+}
+
 typedef struct {
     dim_t dim[4];
 } dims_t;
@@ -32,15 +56,16 @@ typedef struct {
 template<typename T>
 class memCopy {
    public:
-    memCopy(sycl::accessor<T> out, dims_t ostrides, sycl::accessor<T> in,
-            dims_t idims, dims_t istrides, int offset, int groups_0,
-            int groups_1)
+    memCopy(write_accessor<T> out, dims_t ostrides, int ooffset,
+            read_accessor<T> in, dims_t idims, dims_t istrides, int ioffset,
+            int groups_0, int groups_1)
         : out_(out)
-        , in_(in)
         , ostrides_(ostrides)
+        , ooffset_(ooffset)
+        , in_(in)
         , idims_(idims)
         , istrides_(istrides)
-        , offset_(offset)
+        , ioffset_(ioffset)
         , groups_0_(groups_0)
         , groups_1_(groups_1) {}
 
@@ -56,27 +81,33 @@ class memCopy {
         const int id0        = group_id_0 * gg.get_local_range(0) + lid0;
         const int id1        = group_id_1 * gg.get_local_range(1) + lid1;
 
-        T *iptr = in_.get_pointer();
-        iptr += offset_;
+        const T *iptr = in_.get_pointer();
         // FIXME: Do more work per work group
 
         T *optr = out_.get_pointer();
         optr += id3 * ostrides_.dim[3] + id2 * ostrides_.dim[2] +
-                id1 * ostrides_.dim[1];
+                id1 * ostrides_.dim[1] + ooffset_;
         iptr += id3 * istrides_.dim[3] + id2 * istrides_.dim[2] +
-                id1 * istrides_.dim[1];
+                id1 * istrides_.dim[1] + ioffset_;
 
         int istride0 = istrides_.dim[0];
-        if (id0 < idims_.dim[0] && id1 < idims_.dim[1] && id2 < idims_.dim[2] &&
-            id3 < idims_.dim[3]) {
+        size_t idd0  = idims_.dim[0];
+        size_t idd1  = idims_.dim[1];
+        size_t idd2  = idims_.dim[2];
+        size_t idd3  = idims_.dim[3];
+
+        if (id0 < idd0 && id1 < idd1 && id2 < idd2 && id3 < idd3) {
             optr[id0] = iptr[id0 * istride0];
         }
     }
 
    protected:
-    sycl::accessor<T> out_, in_;
-    dims_t ostrides_, idims_, istrides_;
-    int offset_, groups_0_, groups_1_;
+    write_accessor<T> out_;
+    dims_t ostrides_;
+    int ooffset_;
+    read_accessor<T> in_;
+    dims_t idims_, istrides_;
+    int ioffset_, groups_0_, groups_1_;
 };
 
 constexpr uint DIM0 = 32;
@@ -85,13 +116,14 @@ constexpr uint DIM1 = 8;
 template<typename T>
 void memcopy(sycl::buffer<T> *out, const dim_t *ostrides,
              const sycl::buffer<T> *in, const dim_t *idims,
-             const dim_t *istrides, int offset, uint ndims) {
+             const dim_t *istrides, dim_t ioffset, uint indims,
+             dim_t ooffset = 0) {
     dims_t _ostrides = {{ostrides[0], ostrides[1], ostrides[2], ostrides[3]}};
     dims_t _istrides = {{istrides[0], istrides[1], istrides[2], istrides[3]}};
     dims_t _idims    = {{idims[0], idims[1], idims[2], idims[3]}};
 
     size_t local_size[2] = {DIM0, DIM1};
-    if (ndims == 1) {
+    if (indims == 1) {
         local_size[0] *= local_size[1];
         local_size[1] = 1;
     }
@@ -104,81 +136,56 @@ void memcopy(sycl::buffer<T> *out, const dim_t *ostrides,
                           groups_1 * idims[3] * local_size[1]);
     sycl::nd_range<2> ndrange(global, local);
 
-    getQueue().submit([=](sycl::handler &h) {
-        auto out_acc = out->get_access(h);
-        auto in_acc  = const_cast<sycl::buffer<T> *>(in)->get_access(h);
+    getQueue().submit([&](sycl::handler &h) {
+        write_accessor<T> out_acc{*out, h};
+        read_accessor<T> in_acc{*const_cast<sycl::buffer<T> *>(in), h};
 
         h.parallel_for(ndrange,
-                       memCopy<T>(out_acc, _ostrides, in_acc, _idims, _istrides,
-                                  offset, groups_0, groups_1));
+                       memCopy<T>(out_acc, _ostrides, ooffset, in_acc, _idims,
+                                  _istrides, ioffset, groups_0, groups_1));
     });
     ONEAPI_DEBUG_FINISH(getQueue());
 }
 
-template<typename T>
-static T scale(T value, double factor) {
-    return (T)(double(value) * factor);
-}
-
-template<>
-cfloat scale<cfloat>(cfloat value, double factor) {
-    return cfloat{static_cast<float>(value.real() * factor),
-                  static_cast<float>(value.imag() * factor)};
-}
-
-template<>
-cdouble scale<cdouble>(cdouble value, double factor) {
-    return cdouble{value.real() * factor, value.imag() * factor};
-}
-
 template<typename inType, typename outType>
-static outType convertType(inType value) {
+inline outType convertType(inType value) {
     return static_cast<outType>(value);
 }
 
 template<>
-static char convertType<compute_t<arrayfire::common::half>, char>(
+inline char convertType<compute_t<arrayfire::common::half>, char>(
     compute_t<arrayfire::common::half> value) {
     return (char)((short)value);
 }
 
 template<>
-compute_t<arrayfire::common::half> static convertType<
-    char, compute_t<arrayfire::common::half>>(char value) {
+inline compute_t<arrayfire::common::half>
+convertType<char, compute_t<arrayfire::common::half>>(char value) {
     return compute_t<arrayfire::common::half>(value);
 }
 
 template<>
-static unsigned char
-convertType<compute_t<arrayfire::common::half>, unsigned char>(
+unsigned char inline convertType<compute_t<arrayfire::common::half>,
+                                 unsigned char>(
     compute_t<arrayfire::common::half> value) {
     return (unsigned char)((short)value);
 }
 
 template<>
-compute_t<arrayfire::common::half> static convertType<
-    unsigned char, compute_t<arrayfire::common::half>>(unsigned char value) {
+inline compute_t<arrayfire::common::half>
+convertType<unsigned char, compute_t<arrayfire::common::half>>(
+    unsigned char value) {
     return compute_t<arrayfire::common::half>(value);
-}
-
-template<>
-static cdouble convertType<cfloat, cdouble>(cfloat value) {
-    return cdouble(value.real(), value.imag());
-}
-
-template<>
-static cfloat convertType<cdouble, cfloat>(cdouble value) {
-    return cfloat(value.real(), value.imag());
 }
 
 #define OTHER_SPECIALIZATIONS(IN_T)                         \
     template<>                                              \
-    static cfloat convertType<IN_T, cfloat>(IN_T value) {   \
+    inline cfloat convertType<IN_T, cfloat>(IN_T value) {   \
         return cfloat(static_cast<float>(value), 0.0f);     \
     }                                                       \
                                                             \
     template<>                                              \
-    static cdouble convertType<IN_T, cdouble>(IN_T value) { \
+    inline cdouble convertType<IN_T, cdouble>(IN_T value) { \
         return cdouble(static_cast<double>(value), 0.0);    \
     }
 
@@ -197,9 +204,9 @@ OTHER_SPECIALIZATIONS(arrayfire::common::half)
 template<typename inType, typename outType, bool SAMEDIMS>
 class reshapeCopy {
    public:
-    reshapeCopy(sycl::accessor<outType> dst, KParam oInfo,
-                sycl::accessor<inType> src, KParam iInfo, outType default_value,
-                float factor, dims_t trgt, int blk_x, int blk_y)
+    reshapeCopy(write_accessor<outType> dst, KParam oInfo,
+                read_accessor<inType> src, KParam iInfo, outType default_value,
+                factortypes<inType> factor, dims_t trgt, int blk_x, int blk_y)
         : dst_(dst)
         , src_(src)
         , oInfo_(oInfo)
@@ -235,13 +242,22 @@ class reshapeCopy {
         uint istride0 = iInfo_.strides[0];
         uint ostride0 = oInfo_.strides[0];
 
-        if (gy < oInfo_.dims[1] && gz < oInfo_.dims[2] && gw < oInfo_.dims[3]) {
+        size_t odims0 = oInfo_.dims[0];
+        size_t odims1 = oInfo_.dims[1];
+        size_t odims2 = oInfo_.dims[2];
+        size_t odims3 = oInfo_.dims[3];
+
+        size_t tdims0 = trgt_.dim[0];
+        size_t tdims1 = trgt_.dim[1];
+        size_t tdims2 = trgt_.dim[2];
+        size_t tdims3 = trgt_.dim[3];
+
+        if (gy < odims1 && gz < odims2 && gw < odims3) {
             int loop_offset = gg.get_local_range(0) * blk_x_;
-            bool cond =
-                gy < trgt_.dim[1] && gz < trgt_.dim[2] && gw < trgt_.dim[3];
-            for (int rep = gx; rep < oInfo_.dims[0]; rep += loop_offset) {
+            bool cond       = gy < tdims1 && gz < tdims2 && gw < tdims3;
+            for (int rep = gx; rep < odims0; rep += loop_offset) {
                 outType temp = default_value_;
-                if (SAMEDIMS || (rep < trgt_.dim[0] && cond)) {
+                if (SAMEDIMS || (rep < tdims0 && cond)) {
                     temp = convertType<inType, outType>(
                         scale<inType>(in[rep * istride0], factor_));
                 }
@@ -251,11 +267,11 @@ class reshapeCopy {
     }
 
    protected:
-    sycl::accessor<outType> dst_;
-    sycl::accessor<inType> src_;
+    write_accessor<outType> dst_;
+    read_accessor<inType> src_;
     KParam oInfo_, iInfo_;
     outType default_value_;
-    float factor_;
+    factortypes<inType> factor_;
     dims_t trgt_;
     int blk_x_, blk_y_;
 };
@@ -292,21 +308,21 @@ void copy(Param<outType> dst, const Param<inType> src, const int ndims,
         trgt_dims    = {{trgt_i, trgt_j, trgt_k, trgt_l}};
     }
 
-    getQueue().submit([=](sycl::handler &h) {
-        auto dst_acc = dst.data->get_access(h);
-        auto src_acc =
-            const_cast<sycl::buffer<inType> *>(src.data)->get_access(h);
+    getQueue().submit([&](sycl::handler &h) {
+        write_accessor<outType> dst_acc{*dst.data, h};
+        read_accessor<inType> src_acc{
+            *const_cast<sycl::buffer<inType> *>(src.data), h};
 
         if (same_dims) {
-            h.parallel_for(ndrange, reshapeCopy<inType, outType, true>(
-                                        dst_acc, dst.info, src_acc, src.info,
-                                        default_value, (float)factor, trgt_dims,
-                                        blk_x, blk_y));
+            h.parallel_for(ndrange,
+                           reshapeCopy<inType, outType, true>(
+                               dst_acc, dst.info, src_acc, src.info,
+                               default_value, factor, trgt_dims, blk_x, blk_y));
         } else {
-            h.parallel_for(ndrange, reshapeCopy<inType, outType, false>(
-                                        dst_acc, dst.info, src_acc, src.info,
-                                        default_value, (float)factor, trgt_dims,
-                                        blk_x, blk_y));
+            h.parallel_for(ndrange,
+                           reshapeCopy<inType, outType, false>(
+                               dst_acc, dst.info, src_acc, src.info,
+                               default_value, factor, trgt_dims, blk_x, blk_y));
         }
     });
     ONEAPI_DEBUG_FINISH(getQueue());

@@ -12,7 +12,10 @@
 #include <Param.hpp>
 #include <common/dispatch.hpp>
 #include <debug_oneapi.hpp>
+#include <kernel/accessors.hpp>
 #include <traits.hpp>
+
+#include <sycl/sycl.hpp>
 
 #include <string>
 #include <vector>
@@ -20,11 +23,6 @@
 namespace arrayfire {
 namespace oneapi {
 namespace kernel {
-
-template<typename T>
-using read_accessor = sycl::accessor<T, 1, sycl::access::mode::read>;
-template<typename T>
-using write_accessor = sycl::accessor<T, 1, sycl::access::mode::write>;
 
 template<typename T>
 class reorderCreateKernel {
@@ -61,9 +59,9 @@ class reorderCreateKernel {
         const int incy = blocksPerMatY_ * g.get_local_range(1);
         const int incx = blocksPerMatX_ * g.get_local_range(0);
 
-        const int o_off   = ow * op_.strides[3] + oz * op_.strides[2];
-        const int rdims[] = {d0_, d1_, d2_, d3_};
-        int ids[4]        = {0};
+        const int o_off    = ow * op_.strides[3] + oz * op_.strides[2];
+        const int rdims[4] = {d0_, d1_, d2_, d3_};
+        int ids[4]         = {0};
 
         ids[rdims[3]] = ow;
         ids[rdims[2]] = oz;

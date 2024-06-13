@@ -21,6 +21,7 @@
 #include <err_oneapi.hpp>
 #include <errorcodes.hpp>
 #include <memory.hpp>
+#include <onefft.hpp>
 #include <af/oneapi.h>
 #include <af/version.h>
 
@@ -28,7 +29,7 @@
 #include <OpenGL/CGLCurrent.h>
 #endif
 
-#include <sycl/platform.hpp>
+#include <sycl/sycl.hpp>
 
 #include <cctype>
 #include <cstdlib>
@@ -41,6 +42,7 @@
 #include <utility>
 #include <vector>
 
+using sycl::aspect;
 using sycl::context;
 using sycl::device;
 using sycl::platform;
@@ -139,7 +141,7 @@ af_oneapi_platform getPlatformEnum(sycl::device dev) {
 
 string getDeviceInfo() noexcept {
     ostringstream info;
-    info << "ArrayFire v" << AF_VERSION << " (OpenCL, " << get_system()
+    info << "ArrayFire v" << AF_VERSION << " (oneAPI, " << get_system()
          << ", build " << AF_REVISION << ")\n";
 
     try {
@@ -156,11 +158,14 @@ string getDeviceInfo() noexcept {
 
             string id = (show_braces ? string("[") : "-") +
                         to_string(nDevices) + (show_braces ? string("]") : "-");
-
             size_t msize =
                 device->get_info<sycl::info::device::global_mem_size>();
             info << id << " " << getPlatformName(*device) << ": " << ltrim(dstr)
                  << ", " << msize / 1048576 << " MB";
+            info << " (";
+            if (device->has(aspect::fp64)) { info << "fp64 "; }
+            if (device->has(aspect::fp16)) { info << "fp16 "; }
+            info << "\b)";
 #ifndef NDEBUG
             info << " -- ";
             string devVersion = device->get_info<sycl::info::device::version>();
@@ -168,11 +173,6 @@ string getDeviceInfo() noexcept {
                 device->get_info<sycl::info::device::driver_version>();
             info << devVersion;
             info << " -- Device driver " << driVersion;
-            info << " -- FP64 Support: "
-                 << (device->get_info<sycl::info::device::
-                                          preferred_vector_width_double>() > 0
-                         ? "True"
-                         : "False");
             info << " -- Unified Memory ("
                  << (isHostUnifiedMemory(*device) ? "True" : "False") << ")";
 #endif
@@ -320,14 +320,10 @@ const std::string& getActiveDeviceBaseBuildFlags() {
 size_t getDeviceMemorySize(int device) {
     DeviceManager& devMngr = DeviceManager::getInstance();
 
-    sycl::device dev;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        // Assuming devices don't deallocate or are invalidated during execution
-        dev = *devMngr.mDevices[device];
-    }
-    size_t msize = dev.get_info<sycl::info::device::global_mem_size>();
-    return msize;
+    common::lock_guard_t lock(devMngr.deviceMutex);
+    // Assuming devices don't deallocate or are invalidated during execution
+    sycl::device& dev = *devMngr.mDevices[device];
+    return dev.get_info<sycl::info::device::global_mem_size>();
 }
 
 size_t getHostMemorySize() { return common::getHostMemorySize(); }
@@ -389,12 +385,8 @@ bool isDoubleSupported(unsigned device) {
 bool isHalfSupported(unsigned device) {
     DeviceManager& devMngr = DeviceManager::getInstance();
 
-    sycl::device dev;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        dev = *devMngr.mDevices[device];
-    }
-    return dev.has(sycl::aspect::fp16);
+    common::lock_guard_t lock(devMngr.deviceMutex);
+    return devMngr.mDevices[device]->has(sycl::aspect::fp16);
 }
 
 void devprop(char* d_name, char* d_platform, char* d_toolkit, char* d_compute) {
@@ -614,7 +606,7 @@ void setMemoryManager(unique_ptr<MemoryManagerBase> mgr) {
 }
 
 void resetMemoryManager() {
-    return DeviceManager::getInstance().resetMemoryManagerPinned();
+    return DeviceManager::getInstance().resetMemoryManager();
 }
 
 void setMemoryManagerPinned(unique_ptr<MemoryManagerBase> mgr) {
@@ -642,6 +634,16 @@ GraphicsResourceManager& interopManager() {
 
     return *(inst.gfxManagers[id].get());
 }
+
+unique_ptr<PlanCache>& oneFFTManager(const int deviceId) {
+    thread_local unique_ptr<PlanCache> caches[DeviceManager::MAX_DEVICES];
+    thread_local once_flag initFlags[DeviceManager::MAX_DEVICES];
+    call_once(initFlags[deviceId],
+              [&] { caches[deviceId] = make_unique<PlanCache>(); });
+    return caches[deviceId];
+}
+
+PlanCache& fftManager() { return *oneFFTManager(getActiveDeviceId()); }
 
 }  // namespace oneapi
 }  // namespace arrayfire
